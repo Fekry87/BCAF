@@ -7,12 +7,14 @@ node_modules/
 dist/
 build/
 
-# Environment files
+# Environment files (IMPORTANT: Never commit real credentials)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+mock-api/.env
+frontend/.env.production
 
 # Logs
 npm-debug.log*

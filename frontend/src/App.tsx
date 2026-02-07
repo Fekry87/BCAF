@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
 import { UserAuthProvider } from '@/contexts/UserAuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { WebsiteSettingsProvider } from '@/contexts/WebsiteSettingsContext';
 import { AuthModal } from '@/components/layout/AuthModal';
 import { Layout } from '@/components/layout';
 import {
@@ -15,7 +16,7 @@ import {
   StyleGuidePage,
 } from '@/components/pages';
 import Checkout from '@/pages/Checkout';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+import { AdminLayoutWrapper } from '@/components/admin/AdminLayoutWrapper';
 import { AdminLogin } from '@/components/admin/AdminLogin';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { AdminPillars } from '@/components/admin/AdminPillars';
@@ -24,6 +25,8 @@ import { AdminContacts } from '@/components/admin/AdminContacts';
 import { AdminUsers } from '@/components/admin/AdminUsers';
 import { AdminOrders } from '@/components/admin/AdminOrders';
 import { AdminWebSettings } from '@/components/admin/AdminWebSettings';
+import { AdminIntegrations } from '@/components/admin/AdminIntegrations';
+import { AdminSystemSettings } from '@/components/admin/AdminSystemSettings';
 import { ProtectedRoute } from '@/components/admin/ProtectedRoute';
 
 const queryClient = new QueryClient({
@@ -39,11 +42,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <UserAuthProvider>
-            <CartProvider>
-              <BrowserRouter>
-            <Routes>
+        <WebsiteSettingsProvider>
+          <AuthProvider>
+            <UserAuthProvider>
+              <CartProvider>
+                <BrowserRouter>
+                  <Routes>
             {/* Public Routes */}
             <Route element={<Layout />}>
               <Route path="/" element={<HomePage />} />
@@ -62,7 +66,7 @@ function App() {
               path="/admin"
               element={
                 <ProtectedRoute>
-                  <AdminLayout />
+                  <AdminLayoutWrapper />
                 </ProtectedRoute>
               }
             >
@@ -73,25 +77,28 @@ function App() {
               <Route path="messages" element={<AdminContacts />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="settings" element={<AdminWebSettings />} />
+              <Route path="system" element={<AdminSystemSettings />} />
+              <Route path="integrations" element={<AdminIntegrations />} />
             </Route>
-            </Routes>
-            <AuthModal />
-            </BrowserRouter>
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                className: 'font-sans',
-                duration: 4000,
-                style: {
-                  background: '#1a1a1a',
-                  color: '#fff',
-                  borderRadius: '8px',
-                },
-              }}
-            />
-            </CartProvider>
-          </UserAuthProvider>
-        </AuthProvider>
+                  </Routes>
+                  <AuthModal />
+                </BrowserRouter>
+                <Toaster
+                  position="bottom-right"
+                  toastOptions={{
+                    className: 'font-sans',
+                    duration: 4000,
+                    style: {
+                      background: '#1a1a1a',
+                      color: '#fff',
+                      borderRadius: '8px',
+                    },
+                  }}
+                />
+              </CartProvider>
+            </UserAuthProvider>
+          </AuthProvider>
+        </WebsiteSettingsProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

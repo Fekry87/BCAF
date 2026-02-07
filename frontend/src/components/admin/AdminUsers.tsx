@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Trash2, Loader2, Search, Users, UserCheck, UserX, Mail, Phone, Building } from 'lucide-react';
-import { get, patch, del } from '@/services/api';
+import { Trash2, Loader2, Search, Users, UserCheck, UserX, Mail, Phone, Building, RefreshCw, CheckCircle, AlertCircle, Cloud, CloudOff } from 'lucide-react';
+import { get, patch, del, post } from '@/services/api';
 import { Button } from '@/components/ui';
 import type { PaginationMeta } from '@/types';
 
@@ -17,6 +17,11 @@ interface User {
   orderCount: number;
   createdAt: string;
   updatedAt: string;
+  // SuiteDash sync fields
+  suitedash_synced?: boolean;
+  suitedash_contact_id?: string;
+  suitedash_sync_error?: string;
+  suitedash_synced_at?: string;
 }
 
 interface UserStats {
@@ -75,6 +80,32 @@ export function AdminUsers() {
     },
   });
 
+  const syncToSuiteDashMutation = useMutation({
+    mutationFn: (id: number) => post<{ synced: boolean }>(`/admin/users/${id}/sync-suitedash`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      if (data.success) {
+        toast.success('User synced to SuiteDash');
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to sync: ${err.message}`);
+    },
+  });
+
+  const syncAllToSuiteDashMutation = useMutation({
+    mutationFn: () => post<{ synced: number; failed: number; total: number }>('/admin/users/sync-all-suitedash'),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      if (data.success && data.data) {
+        toast.success(`Synced ${data.data.synced} of ${data.data.total} users`);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to sync: ${err.message}`);
+    },
+  });
+
   const users = usersData?.data || [];
   const stats = statsData?.data;
   const pagination = usersData?.meta?.pagination as PaginationMeta | undefined;
@@ -89,6 +120,19 @@ export function AdminUsers() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h1 className="text-h2 text-white">Registered Users</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => syncAllToSuiteDashMutation.mutate()}
+          disabled={syncAllToSuiteDashMutation.isPending}
+        >
+          {syncAllToSuiteDashMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Cloud className="h-4 w-4 mr-2" />
+          )}
+          Sync All to SuiteDash
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -194,6 +238,7 @@ export function AdminUsers() {
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Contact</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Orders</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">SuiteDash</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Joined</th>
                     <th className="px-6 py-4 text-right text-sm font-semibold text-slate-300">Actions</th>
                   </tr>
@@ -247,6 +292,34 @@ export function AdminUsers() {
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
                         </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {user.suitedash_synced ? (
+                            <span className="flex items-center gap-1 text-xs text-green-400" title={`Synced at ${user.suitedash_synced_at ? new Date(user.suitedash_synced_at).toLocaleString() : 'N/A'}`}>
+                              <CheckCircle className="h-4 w-4" />
+                              Synced
+                            </span>
+                          ) : user.suitedash_sync_error ? (
+                            <span className="flex items-center gap-1 text-xs text-red-400" title={user.suitedash_sync_error}>
+                              <AlertCircle className="h-4 w-4" />
+                              Error
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-slate-500">
+                              <CloudOff className="h-4 w-4" />
+                              Not synced
+                            </span>
+                          )}
+                          <button
+                            onClick={() => syncToSuiteDashMutation.mutate(user.id)}
+                            disabled={syncToSuiteDashMutation.isPending}
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors disabled:opacity-50"
+                            title="Sync to SuiteDash"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${syncToSuiteDashMutation.isPending ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-sm text-slate-300">

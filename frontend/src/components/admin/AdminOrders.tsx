@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Trash2, Loader2, Search, ShoppingCart, Clock, DollarSign, Eye, X } from 'lucide-react';
-import { get, patch, del } from '@/services/api';
+import { Trash2, Loader2, Search, ShoppingCart, Clock, DollarSign, Eye, X, RefreshCw, CheckCircle, AlertCircle, Cloud, CloudOff } from 'lucide-react';
+import { get, patch, del, post } from '@/services/api';
 import { Button } from '@/components/ui';
 import type { PaginationMeta } from '@/types';
 
@@ -33,6 +33,13 @@ interface Order {
   payment_status_label?: string;
   createdAt: string;
   updatedAt: string;
+  // SuiteDash sync fields
+  suitedash_synced?: boolean;
+  suitedash_contact_id?: string;
+  suitedash_invoice_id?: string;
+  suitedash_sync_error?: string;
+  suitedash_synced_at?: string;
+  payment_url?: string;
 }
 
 interface OrderStats {
@@ -111,6 +118,32 @@ export function AdminOrders() {
     },
   });
 
+  const syncToSuiteDashMutation = useMutation({
+    mutationFn: (id: number) => post<{ synced: boolean }>(`/admin/orders/${id}/sync-suitedash`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      if (data.success) {
+        toast.success('Order synced to SuiteDash');
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to sync: ${err.message}`);
+    },
+  });
+
+  const syncAllToSuiteDashMutation = useMutation({
+    mutationFn: () => post<{ synced: number; failed: number; total: number }>('/admin/orders/sync-all-suitedash'),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      if (data.success && data.data) {
+        toast.success(`Synced ${data.data.synced} of ${data.data.total} orders`);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to sync: ${err.message}`);
+    },
+  });
+
   const orders = ordersData?.data || [];
   const stats = statsData?.data;
   const pagination = ordersData?.meta?.pagination as PaginationMeta | undefined;
@@ -125,6 +158,19 @@ export function AdminOrders() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h1 className="text-h2 text-white">Orders</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => syncAllToSuiteDashMutation.mutate()}
+          disabled={syncAllToSuiteDashMutation.isPending}
+        >
+          {syncAllToSuiteDashMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Cloud className="h-4 w-4 mr-2" />
+          )}
+          Sync All to SuiteDash
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -252,6 +298,7 @@ export function AdminOrders() {
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Total</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Payment</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">SuiteDash</th>
                     <th className="px-6 py-4 text-right text-sm font-semibold text-slate-300">Actions</th>
                   </tr>
                 </thead>
@@ -317,6 +364,34 @@ export function AdminOrders() {
                           <option value="paid">Paid</option>
                           <option value="refunded">Refunded</option>
                         </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {order.suitedash_synced ? (
+                            <span className="flex items-center gap-1 text-xs text-green-400" title={`Synced at ${order.suitedash_synced_at ? new Date(order.suitedash_synced_at).toLocaleString() : 'N/A'}`}>
+                              <CheckCircle className="h-4 w-4" />
+                              Synced
+                            </span>
+                          ) : order.suitedash_sync_error ? (
+                            <span className="flex items-center gap-1 text-xs text-red-400" title={order.suitedash_sync_error}>
+                              <AlertCircle className="h-4 w-4" />
+                              Error
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-slate-500">
+                              <CloudOff className="h-4 w-4" />
+                              Not synced
+                            </span>
+                          )}
+                          <button
+                            onClick={() => syncToSuiteDashMutation.mutate(order.id)}
+                            disabled={syncToSuiteDashMutation.isPending}
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors disabled:opacity-50"
+                            title="Sync to SuiteDash"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${syncToSuiteDashMutation.isPending ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
@@ -484,6 +559,89 @@ export function AdminOrders() {
                     <option value="paid">Paid</option>
                     <option value="refunded">Refunded</option>
                   </select>
+                </div>
+              </div>
+
+              {/* SuiteDash Sync */}
+              <div className="border-t border-slate-700 pt-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Cloud className="h-5 w-5 text-blue-400" />
+                  SuiteDash Integration
+                </h3>
+                <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-300">Sync Status:</span>
+                    {selectedOrder.suitedash_synced ? (
+                      <span className="flex items-center gap-1 text-sm text-green-400">
+                        <CheckCircle className="h-4 w-4" />
+                        Synced
+                      </span>
+                    ) : selectedOrder.suitedash_sync_error ? (
+                      <span className="flex items-center gap-1 text-sm text-red-400">
+                        <AlertCircle className="h-4 w-4" />
+                        Error
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-slate-500">
+                        <CloudOff className="h-4 w-4" />
+                        Not synced
+                      </span>
+                    )}
+                  </div>
+                  {selectedOrder.suitedash_synced_at && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">Synced At:</span>
+                      <span className="text-sm text-slate-400">
+                        {new Date(selectedOrder.suitedash_synced_at).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {selectedOrder.suitedash_contact_id && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">Contact ID:</span>
+                      <span className="text-sm text-slate-400 font-mono">{selectedOrder.suitedash_contact_id}</span>
+                    </div>
+                  )}
+                  {selectedOrder.suitedash_invoice_id && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">Invoice ID:</span>
+                      <span className="text-sm text-slate-400 font-mono">{selectedOrder.suitedash_invoice_id}</span>
+                    </div>
+                  )}
+                  {selectedOrder.suitedash_sync_error && (
+                    <div className="mt-2 p-2 bg-red-500/10 rounded border border-red-500/30">
+                      <p className="text-xs text-red-400">{selectedOrder.suitedash_sync_error}</p>
+                    </div>
+                  )}
+                  {selectedOrder.payment_url && (
+                    <div className="mt-2">
+                      <a
+                        href={selectedOrder.payment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 underline"
+                      >
+                        View Payment Link →
+                      </a>
+                    </div>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-slate-600">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        syncToSuiteDashMutation.mutate(selectedOrder.id);
+                      }}
+                      disabled={syncToSuiteDashMutation.isPending}
+                    >
+                      {syncToSuiteDashMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      {selectedOrder.suitedash_synced ? 'Re-sync to SuiteDash' : 'Sync to SuiteDash'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

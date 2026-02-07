@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Mail, Phone, MapPin, Linkedin, Twitter } from 'lucide-react';
 import { pillarsApi } from '@/services/pillars';
 import { get } from '@/services/api';
+import { useWebsiteSettings } from '@/contexts/WebsiteSettingsContext';
 
 interface SiteSettings {
   site_name: string;
@@ -27,6 +28,7 @@ const defaultLegalLinks = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const { isPageVisible } = useWebsiteSettings();
 
   const { data: pillarsData } = useQuery({
     queryKey: ['pillars'],
@@ -47,13 +49,25 @@ export function Footer() {
   const settings = settingsData?.data;
   const footer = footerData?.data;
 
-  // Build quick links dynamically
+  // Map routes to page visibility keys
+  const routeToPageKey: Record<string, 'home' | 'about' | 'contact'> = {
+    '/': 'home',
+    '/about': 'about',
+    '/contact': 'contact',
+  };
+
+  // Build quick links dynamically, filtering out hidden pages
   const quickLinks = [
     { to: '/', label: 'Home' },
     ...pillars.map(p => ({ to: `/${p.slug}`, label: p.name })),
     { to: '/about', label: 'About Us' },
     { to: '/contact', label: 'Contact' },
-  ];
+  ].filter(link => {
+    const pageKey = routeToPageKey[link.to];
+    // If it's a pillar link or page visibility check passes, show it
+    if (!pageKey) return true;
+    return isPageVisible(pageKey);
+  });
 
   const legalLinks = footer?.legal_links || defaultLegalLinks;
   const brandDescription = footer?.brand_description ||

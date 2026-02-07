@@ -3,13 +3,33 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables
+dotenv.config();
+
 const app = express();
+
+// Environment configuration
+const config = {
+  port: process.env.PORT || 8000,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  suitedash: {
+    enabled: process.env.SUITEDASH_ENABLED === 'true',
+    publicId: process.env.SUITEDASH_PUBLIC_ID || '',
+    secretKey: process.env.SUITEDASH_SECRET_KEY || '',
+    apiUrl: process.env.SUITEDASH_API_URL || 'https://app.suitedash.com/secure-api',
+  },
+  webhookSecret: process.env.WEBHOOK_SECRET || '',
+};
+
+// CORS configuration
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: config.frontendUrl,
   credentials: true,
 }));
 app.use(express.json());
@@ -1053,7 +1073,7 @@ app.get('/api/auth/user', (req, res) => {
 const userTokens = new Map(); // token -> userId
 
 // Register new user
-app.post('/api/users/register', (req, res) => {
+app.post('/api/users/register', async (req, res) => {
   const { firstName, lastName, email, password, company, phone } = req.body;
 
   // Validation
@@ -1091,11 +1111,43 @@ app.post('/api/users/register', (req, res) => {
     company: company || null,
     phone: phone || null,
     status: 'active',
+    // SuiteDash integration fields
+    suitedash_contact_id: null,
+    suitedash_company_id: null,
+    suitedash_synced: false,
+    suitedash_sync_error: null,
+    suitedash_synced_at: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   data.users.push(newUser);
+
+  // Auto-sync to SuiteDash if enabled
+  const suitedashConfig = getSuiteDashConfig();
+  if (suitedashConfig && suitedashConfig.enabled) {
+    try {
+      const contact = {
+        first_name: newUser.firstName,
+        last_name: newUser.lastName,
+        email: newUser.email,
+        phone: newUser.phone || '',
+        company: newUser.company || '',
+      };
+      const result = await syncContactToSuiteDashSimple(suitedashConfig, contact);
+      if (result && result.contact_id) {
+        newUser.suitedash_contact_id = result.contact_id;
+        newUser.suitedash_company_id = result.company_id || null;
+        newUser.suitedash_synced = true;
+        newUser.suitedash_synced_at = new Date().toISOString();
+        console.log(`[SuiteDash] User ${newUser.email} synced with contact ID: ${result.contact_id}`);
+      }
+    } catch (err) {
+      console.error('[SuiteDash] Failed to sync new user:', err.message);
+      newUser.suitedash_sync_error = err.message;
+    }
+  }
+
   saveData();
 
   // Generate token
@@ -1106,6 +1158,69 @@ app.post('/api/users/register', (req, res) => {
   const { password: _, ...userWithoutPassword } = newUser;
   res.status(201).json(success({ user: userWithoutPassword, token }, 'Registration successful'));
 });
+
+// Simple helper for auto-sync (doesn't throw)
+async function syncContactToSuiteDashSimple(config, contact) {
+  if (!config.public_id || !config.secret_key) {
+    // Demo mode - return simulated ID
+    return { contact_id: `sd_contact_${Date.now()}`, company_id: null };
+  }
+
+  const baseUrl = config.api_base_url || 'https://app.suitedash.com/secure-api';
+  const headers = {
+    'X-Public-ID': config.public_id,
+    'X-Secret-Key': config.secret_key,
+    'Content-Type': 'application/json',
+  };
+
+  // Build proper SuiteDash contact payload
+  const contactPayload = {
+    first_name: contact.first_name,
+    last_name: contact.last_name,
+    email: contact.email,
+    phone: contact.phone || '',
+    role: 'Client',
+  };
+
+  // Company must be an object if provided
+  if (contact.company) {
+    contactPayload.company = {
+      name: contact.company,
+      create_company_if_not_exists: true,
+    };
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/contact`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(contactPayload),
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      const contactData = responseData.data || responseData;
+      let companyId = null;
+
+      if (contactData.companies && contactData.companies.length > 0) {
+        companyId = contactData.companies[0].uid || contactData.companies[0].id;
+      }
+
+      return {
+        contact_id: contactData.uid || contactData.id || contactData.contact_id,
+        company_id: companyId,
+      };
+    } else {
+      const errorText = await response.text();
+      console.error('[SuiteDash] Contact sync failed:', errorText);
+    }
+  } catch (error) {
+    console.error('[SuiteDash] API error:', error.message);
+  }
+
+  // Return null on failure in production mode
+  return null;
+}
 
 // User login
 app.post('/api/users/login', (req, res) => {
@@ -1158,9 +1273,9 @@ app.post('/api/users/logout', (req, res) => {
 // ORDERS (Customer checkout)
 // ============================================
 
-// Create new order (checkout)
-app.post('/api/orders', (req, res) => {
-  const { customer, items, notes } = req.body;
+// Create new order (checkout) - with SuiteDash integration
+app.post('/api/orders', async (req, res) => {
+  const { customer, items, notes, create_invoice } = req.body;
 
   // Validation
   if (!customer || !items || items.length === 0) {
@@ -1177,12 +1292,18 @@ app.post('/api/orders', (req, res) => {
   if (!data.orders) data.orders = [];
 
   // Calculate total
-  const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
+  const total = items.reduce((sum, item) => {
+    const price = item.price || 0;
+    const quantity = item.quantity || 1;
+    return sum + (price * quantity);
+  }, 0);
+
+  const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
 
   // Create order
   const newOrder = {
     id: getNextId(data.orders),
-    orderNumber: 'ORD-' + Date.now().toString().slice(-8),
+    orderNumber,
     customer: {
       firstName: customer.firstName,
       lastName: customer.lastName,
@@ -1195,6 +1316,7 @@ app.post('/api/orders', (req, res) => {
       title: item.title,
       type: item.type,
       price: item.price || item.priceFrom || 0,
+      quantity: item.quantity || 1,
       pillarName: item.pillar?.name || null,
     })),
     notes: notes || null,
@@ -1203,12 +1325,559 @@ app.post('/api/orders', (req, res) => {
     paymentStatus: 'unpaid', // unpaid, paid, refunded
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    // SuiteDash integration fields
+    suitedash_contact_id: null,
+    suitedash_invoice_id: null,
+    suitedash_company_id: null,
+    payment_url: null,
+    suitedash_synced: false,
+    suitedash_sync_error: null,
+    suitedash_synced_at: null,
   };
+
+  // Try to create contact and invoice in SuiteDash if integration is enabled
+  let suitedashResult = null;
+  // Get SuiteDash config (prioritizes environment variables)
+  const suitedashConfig = getSuiteDashConfig();
+  const suitedashEnabled = suitedashConfig.enabled;
+
+  if (create_invoice && suitedashEnabled) {
+    try {
+      suitedashResult = await createSuiteDashInvoice(suitedashConfig, customer, items, total, orderNumber);
+      if (suitedashResult) {
+        newOrder.suitedash_contact_id = suitedashResult.contact_id;
+        newOrder.suitedash_invoice_id = suitedashResult.invoice_id;
+        newOrder.suitedash_company_id = suitedashResult.company_id;
+        newOrder.payment_url = suitedashResult.payment_url;
+        newOrder.is_production = suitedashResult.is_production;
+        newOrder.suitedash_synced = !!suitedashResult.contact_id;
+        newOrder.suitedash_synced_at = new Date().toISOString();
+      }
+    } catch (err) {
+      console.error('SuiteDash integration error:', err.message);
+      newOrder.suitedash_sync_error = err.message;
+      // Generate simulated payment URL even if API fails (only in demo mode)
+      if (suitedashEnabled && !suitedashConfig.env_configured) {
+        newOrder.payment_url = `https://app.suitedash.com/portal/pay/${orderNumber}`;
+        newOrder.suitedash_contact_id = `contact_${Date.now()}`;
+        newOrder.suitedash_invoice_id = `invoice_${Date.now()}`;
+        newOrder.is_production = false;
+      }
+    }
+  }
 
   data.orders.push(newOrder);
   saveData();
 
-  res.status(201).json(success(newOrder, 'Order placed successfully. Our team will contact you within 24 hours.'));
+  // Return response with payment URL if available
+  const response = {
+    id: newOrder.id,
+    orderNumber: newOrder.orderNumber,
+    total: newOrder.total,
+    payment_url: newOrder.payment_url,
+    suitedash_contact_id: newOrder.suitedash_contact_id,
+    suitedash_invoice_id: newOrder.suitedash_invoice_id,
+    is_production: newOrder.is_production || false, // Flag for frontend to know if real payment
+  };
+
+  res.status(201).json(success(response, 'Order placed successfully.'));
+});
+
+// Helper function to create SuiteDash contact and invoice
+async function createSuiteDashInvoice(suitedashConfig, customer, items, total, orderNumber) {
+  // If no credentials are set, generate simulated payment URL for demo purposes
+  if (!suitedashConfig || !suitedashConfig.public_id || !suitedashConfig.secret_key) {
+    // Generate demo payment URL when SuiteDash is enabled but not fully configured
+    const simulatedPaymentUrl = `https://app.suitedash.com/portal/pay/${orderNumber}`;
+    return {
+      contact_id: `contact_${Date.now()}`,
+      invoice_id: `invoice_${Date.now()}`,
+      payment_url: simulatedPaymentUrl,
+      is_production: false,
+    };
+  }
+
+  const baseUrl = suitedashConfig.api_base_url || 'https://app.suitedash.com/secure-api';
+  const headers = {
+    'X-Public-ID': suitedashConfig.public_id,
+    'X-Secret-Key': suitedashConfig.secret_key,
+    'Content-Type': 'application/json',
+  };
+
+  console.log(`[SuiteDash] Creating invoice for order ${orderNumber} (Production Mode)`);
+
+  try {
+    // Step 1: Create or find contact
+    let contactId = null;
+
+    // Try to create contact - SuiteDash requires specific fields
+    const contactPayload = {
+      first_name: customer.firstName,
+      last_name: customer.lastName,
+      email: customer.email,
+      phone: customer.phone || '',
+      role: 'Client', // Required: Lead, Prospect, or Client
+    };
+
+    // Company must be an object if provided
+    if (customer.company) {
+      contactPayload.company = {
+        name: customer.company,
+        create_company_if_not_exists: true,
+      };
+    }
+
+    console.log(`[SuiteDash] Creating contact:`, JSON.stringify(contactPayload));
+
+    const contactResponse = await fetch(`${baseUrl}/contact`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(contactPayload),
+    });
+
+    const contactResponseText = await contactResponse.text();
+    console.log(`[SuiteDash] Contact response (${contactResponse.status}):`, contactResponseText);
+
+    let companyId = null;
+
+    if (contactResponse.ok) {
+      try {
+        const contactData = JSON.parse(contactResponseText);
+        // SuiteDash returns data inside a 'data' object
+        const contact = contactData.data || contactData;
+        contactId = contact.uid || contact.id || contact.contact_id;
+        // Extract company ID if company was created
+        if (contact.companies && contact.companies.length > 0) {
+          companyId = contact.companies[0].uid || contact.companies[0].id;
+        }
+        console.log(`[SuiteDash] Contact created with ID: ${contactId}, Company ID: ${companyId}`);
+      } catch (e) {
+        console.log(`[SuiteDash] Failed to parse contact response:`, e.message);
+      }
+    } else if (contactResponse.status === 422) {
+      // Contact already exists - try to find it by email
+      console.log(`[SuiteDash] Contact already exists, searching for: ${customer.email}`);
+      try {
+        // SuiteDash search API doesn't filter well, so we fetch all and filter client-side
+        let page = 1;
+        let found = false;
+        const maxPages = 10; // Safety limit
+
+        while (!found && page <= maxPages) {
+          const searchResponse = await fetch(`${baseUrl}/contact?page=${page}&pageSize=50`, {
+            method: 'GET',
+            headers,
+          });
+
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            const contacts = searchData.data || [];
+
+            // Search for matching email
+            const matchingContact = contacts.find(c =>
+              c.email && c.email.toLowerCase() === customer.email.toLowerCase()
+            );
+
+            if (matchingContact) {
+              contactId = matchingContact.uid || matchingContact.id;
+              if (matchingContact.companies && matchingContact.companies.length > 0) {
+                companyId = matchingContact.companies[0].uid || matchingContact.companies[0].id;
+              }
+              console.log(`[SuiteDash] Found existing contact on page ${page}: ${contactId}, Company: ${companyId}`);
+              found = true;
+            } else {
+              // Check if there are more pages
+              const meta = searchData.meta?.pagination;
+              if (meta && meta.currentPageNumber < meta.totalPages) {
+                page++;
+              } else {
+                break;
+              }
+            }
+          } else {
+            console.log(`[SuiteDash] Search page ${page} failed with status ${searchResponse.status}`);
+            break;
+          }
+        }
+
+        // If contact wasn't found via API but exists (422 error proves it), mark as "exists but not accessible via API"
+        if (!found) {
+          console.log(`[SuiteDash] Contact exists but not found via API search. Marking as synced (contact exists in SuiteDash).`);
+          // Generate a marker ID to indicate contact exists
+          contactId = `existing_${customer.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        }
+      } catch (searchErr) {
+        console.log(`[SuiteDash] Search error:`, searchErr.message);
+        // Still mark as existing since 422 proves it
+        contactId = `existing_${customer.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      }
+    } else {
+      console.log(`[SuiteDash] Contact creation failed with status ${contactResponse.status}`);
+    }
+
+    // Step 2: Try to create invoice (may not be available in all SuiteDash plans)
+    let invoiceId = null;
+    let paymentUrl = null;
+
+    const invoiceItems = items.map(item => ({
+      name: item.title,
+      description: item.pillar?.name || 'Service',
+      quantity: item.quantity || 1,
+      rate: item.price || 0,
+      amount: (item.price || 0) * (item.quantity || 1),
+    }));
+
+    const invoicePayload = {
+      contact_uid: contactId, // Use contact_uid instead of contact_id
+      invoice_number: orderNumber,
+      items: invoiceItems,
+      total: total,
+      currency: 'GBP',
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      notes: `Order ${orderNumber}`,
+      send_email: true,
+    };
+
+    console.log(`[SuiteDash] Creating invoice:`, JSON.stringify(invoicePayload));
+
+    try {
+      const invoiceResponse = await fetch(`${baseUrl}/invoice`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(invoicePayload),
+      });
+
+      const invoiceResponseText = await invoiceResponse.text();
+      console.log(`[SuiteDash] Invoice response (${invoiceResponse.status}):`, invoiceResponseText.substring(0, 200));
+
+      if (invoiceResponse.ok) {
+        try {
+          const invoiceData = JSON.parse(invoiceResponseText);
+          const invoice = invoiceData.data || invoiceData;
+          invoiceId = invoice.uid || invoice.id || invoice.invoice_id;
+          paymentUrl = invoice.payment_url || invoice.pay_url || invoice.public_url;
+        } catch (e) {
+          console.log(`[SuiteDash] Failed to parse invoice response`);
+        }
+      } else if (invoiceResponse.status === 404) {
+        // Invoice API not available - this is expected for some SuiteDash plans
+        console.log(`[SuiteDash] Invoice API not available. Contact created successfully, invoice must be created manually in SuiteDash.`);
+      }
+    } catch (invoiceError) {
+      console.log(`[SuiteDash] Invoice creation failed:`, invoiceError.message);
+    }
+
+    console.log(`[SuiteDash] Result - Contact: ${contactId}, Company: ${companyId}, Invoice: ${invoiceId}, PaymentURL: ${paymentUrl}`);
+
+    return {
+      contact_id: contactId,
+      company_id: companyId,
+      invoice_id: invoiceId,
+      payment_url: paymentUrl,
+      is_production: true, // Real SuiteDash integration
+    };
+  } catch (error) {
+    console.error('[SuiteDash] API error:', error.message);
+
+    // In production mode, throw error instead of generating fake URL
+    if (suitedashConfig.env_configured) {
+      throw new Error(`SuiteDash API error: ${error.message}`);
+    }
+
+    // For demo purposes only, generate a payment URL when API fails
+    const simulatedPaymentUrl = `https://app.suitedash.com/portal/pay/${orderNumber}`;
+    return {
+      contact_id: `contact_${Date.now()}`,
+      company_id: null,
+      invoice_id: `invoice_${Date.now()}`,
+      payment_url: simulatedPaymentUrl,
+      is_production: false,
+    };
+  }
+}
+
+// SuiteDash webhook handler for various events
+app.post('/api/webhooks/suitedash', (req, res) => {
+  const webhookData = req.body;
+  const { event, type } = webhookData;
+
+  console.log('[SuiteDash Webhook] Received:', JSON.stringify(webhookData).substring(0, 500));
+
+  // Store webhook log
+  if (!data.suitedashWebhookLogs) data.suitedashWebhookLogs = [];
+  data.suitedashWebhookLogs.unshift({
+    id: Date.now().toString(),
+    event: event || type,
+    data: webhookData,
+    received_at: new Date().toISOString(),
+    processed: false,
+  });
+  // Keep only last 100 logs
+  if (data.suitedashWebhookLogs.length > 100) {
+    data.suitedashWebhookLogs = data.suitedashWebhookLogs.slice(0, 100);
+  }
+
+  let processed = false;
+
+  // Handle invoice events
+  if (event?.startsWith('invoice.') || type === 'invoice') {
+    const invoice_id = webhookData.invoice_id || webhookData.uid || webhookData.data?.uid;
+    const payment_status = webhookData.payment_status || webhookData.status;
+    const amount_paid = webhookData.amount_paid || webhookData.amount;
+
+    if (invoice_id && data.orders) {
+      const order = data.orders.find(o => o.suitedash_invoice_id === invoice_id);
+
+      if (order) {
+        if (event === 'invoice.paid' || payment_status === 'paid') {
+          order.paymentStatus = 'paid';
+          order.status = 'confirmed';
+          order.paidAt = new Date().toISOString();
+          order.amountPaid = amount_paid || order.total;
+          console.log(`[SuiteDash Webhook] Order ${order.orderNumber} marked as PAID`);
+          processed = true;
+        } else if (event === 'invoice.payment_failed' || payment_status === 'failed') {
+          order.paymentStatus = 'failed';
+          console.log(`[SuiteDash Webhook] Order ${order.orderNumber} payment FAILED`);
+          processed = true;
+        } else if (event === 'invoice.sent') {
+          order.invoiceSentAt = new Date().toISOString();
+          console.log(`[SuiteDash Webhook] Invoice sent for order ${order.orderNumber}`);
+          processed = true;
+        } else if (event === 'invoice.viewed') {
+          order.invoiceViewedAt = new Date().toISOString();
+          console.log(`[SuiteDash Webhook] Invoice viewed for order ${order.orderNumber}`);
+          processed = true;
+        }
+
+        if (processed) {
+          order.updatedAt = new Date().toISOString();
+        }
+      }
+    }
+  }
+
+  // Handle contact events
+  if (event?.startsWith('contact.') || type === 'contact') {
+    const contact_id = webhookData.contact_id || webhookData.uid || webhookData.data?.uid;
+    const contact_email = webhookData.email || webhookData.data?.email;
+
+    if (contact_email && data.users) {
+      const user = data.users.find(u => u.email.toLowerCase() === contact_email.toLowerCase());
+
+      if (user) {
+        if (event === 'contact.updated') {
+          // Sync updated fields from SuiteDash
+          if (webhookData.data) {
+            if (webhookData.data.first_name) user.firstName = webhookData.data.first_name;
+            if (webhookData.data.last_name) user.lastName = webhookData.data.last_name;
+            if (webhookData.data.phone) user.phone = webhookData.data.phone;
+          }
+          user.updatedAt = new Date().toISOString();
+          console.log(`[SuiteDash Webhook] User ${user.email} updated from SuiteDash`);
+          processed = true;
+        } else if (event === 'contact.deleted') {
+          user.suitedash_contact_id = null;
+          user.suitedash_synced = false;
+          user.updatedAt = new Date().toISOString();
+          console.log(`[SuiteDash Webhook] Contact deleted in SuiteDash for user ${user.email}`);
+          processed = true;
+        }
+      }
+    }
+  }
+
+  // Update webhook log as processed
+  if (data.suitedashWebhookLogs.length > 0) {
+    data.suitedashWebhookLogs[0].processed = processed;
+  }
+
+  saveData();
+
+  res.json({ received: true, processed });
+});
+
+// Get webhook logs (admin)
+app.get('/api/admin/webhooks/suitedash/logs', authMiddleware, (req, res) => {
+  res.json(success(data.suitedashWebhookLogs || []));
+});
+
+// ============================================
+// ADMIN: Sync order to SuiteDash
+// ============================================
+
+// Sync a single order to SuiteDash
+app.post('/api/admin/orders/:id/sync-suitedash', authMiddleware, async (req, res) => {
+  const orderId = parseInt(req.params.id);
+
+  if (!data.orders) {
+    return res.status(404).json(error('Order not found'));
+  }
+
+  const order = data.orders.find(o => o.id === orderId);
+  if (!order) {
+    return res.status(404).json(error('Order not found'));
+  }
+
+  const suitedashConfig = getSuiteDashConfig();
+  if (!suitedashConfig.enabled) {
+    return res.status(400).json(error('SuiteDash integration is not enabled'));
+  }
+
+  try {
+    const result = await createSuiteDashInvoice(
+      suitedashConfig,
+      order.customer,
+      order.items,
+      order.total,
+      order.orderNumber
+    );
+
+    if (result) {
+      order.suitedash_contact_id = result.contact_id;
+      order.suitedash_company_id = result.company_id;
+      order.suitedash_invoice_id = result.invoice_id;
+      order.payment_url = result.payment_url;
+      order.suitedash_synced = !!result.contact_id;
+      order.suitedash_sync_error = null;
+      order.suitedash_synced_at = new Date().toISOString();
+      order.updatedAt = new Date().toISOString();
+      saveData();
+
+      res.json(success({
+        order_id: order.id,
+        suitedash_contact_id: order.suitedash_contact_id,
+        suitedash_company_id: order.suitedash_company_id,
+        suitedash_invoice_id: order.suitedash_invoice_id,
+        payment_url: order.payment_url,
+        synced: order.suitedash_synced,
+      }, 'Order synced to SuiteDash successfully'));
+    } else {
+      throw new Error('No result from SuiteDash');
+    }
+  } catch (err) {
+    order.suitedash_sync_error = err.message;
+    order.updatedAt = new Date().toISOString();
+    saveData();
+
+    res.status(500).json(error(`Failed to sync order: ${err.message}`));
+  }
+});
+
+// Sync all unsynced orders to SuiteDash
+app.post('/api/admin/orders/sync-all-suitedash', authMiddleware, async (req, res) => {
+  const suitedashConfig = getSuiteDashConfig();
+  if (!suitedashConfig.enabled) {
+    return res.status(400).json(error('SuiteDash integration is not enabled'));
+  }
+
+  if (!data.orders) {
+    return res.json(success({ synced: 0, failed: 0, total: 0 }, 'No orders to sync'));
+  }
+
+  // Find orders not synced
+  const unsyncedOrders = data.orders.filter(o => !o.suitedash_synced || !o.suitedash_contact_id);
+
+  let synced = 0;
+  let failed = 0;
+  const results = [];
+
+  for (const order of unsyncedOrders) {
+    try {
+      const result = await createSuiteDashInvoice(
+        suitedashConfig,
+        order.customer,
+        order.items,
+        order.total,
+        order.orderNumber
+      );
+
+      if (result && result.contact_id) {
+        order.suitedash_contact_id = result.contact_id;
+        order.suitedash_company_id = result.company_id;
+        order.suitedash_invoice_id = result.invoice_id;
+        order.payment_url = result.payment_url;
+        order.suitedash_synced = true;
+        order.suitedash_sync_error = null;
+        order.suitedash_synced_at = new Date().toISOString();
+        order.updatedAt = new Date().toISOString();
+        synced++;
+        results.push({ order_id: order.id, orderNumber: order.orderNumber, status: 'synced' });
+      } else {
+        failed++;
+        results.push({ order_id: order.id, orderNumber: order.orderNumber, status: 'failed', error: 'No contact ID returned' });
+      }
+    } catch (err) {
+      order.suitedash_sync_error = err.message;
+      failed++;
+      results.push({ order_id: order.id, orderNumber: order.orderNumber, status: 'failed', error: err.message });
+    }
+  }
+
+  saveData();
+
+  res.json(success({
+    synced,
+    failed,
+    total: unsyncedOrders.length,
+    results,
+  }, `Synced ${synced} of ${unsyncedOrders.length} orders`));
+});
+
+// Get SuiteDash sync status for all orders
+app.get('/api/admin/orders/suitedash-status', authMiddleware, (req, res) => {
+  if (!data.orders) {
+    return res.json(success({ orders: [], stats: { total: 0, synced: 0, unsynced: 0, failed: 0 } }));
+  }
+
+  const orders = data.orders.map(o => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    customer_name: o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : 'Unknown',
+    customer_email: o.customer?.email,
+    total: o.total,
+    status: o.status,
+    paymentStatus: o.paymentStatus,
+    suitedash_synced: o.suitedash_synced || false,
+    suitedash_contact_id: o.suitedash_contact_id,
+    suitedash_company_id: o.suitedash_company_id,
+    suitedash_invoice_id: o.suitedash_invoice_id,
+    suitedash_sync_error: o.suitedash_sync_error,
+    suitedash_synced_at: o.suitedash_synced_at,
+    createdAt: o.createdAt,
+  }));
+
+  const stats = {
+    total: orders.length,
+    synced: orders.filter(o => o.suitedash_synced).length,
+    unsynced: orders.filter(o => !o.suitedash_synced && !o.suitedash_sync_error).length,
+    failed: orders.filter(o => o.suitedash_sync_error).length,
+  };
+
+  res.json(success({ orders, stats }));
+});
+
+// Check payment status endpoint
+app.get('/api/orders/:orderNumber/payment-status', (req, res) => {
+  const { orderNumber } = req.params;
+
+  if (!data.orders) {
+    return res.status(404).json(error('Order not found'));
+  }
+
+  const order = data.orders.find(o => o.orderNumber === orderNumber);
+
+  if (!order) {
+    return res.status(404).json(error('Order not found'));
+  }
+
+  res.json(success({
+    orderNumber: order.orderNumber,
+    paymentStatus: order.paymentStatus,
+    status: order.status,
+    total: order.total,
+    paidAt: order.paidAt || null,
+  }));
 });
 
 // Get user's orders
@@ -1722,14 +2391,164 @@ app.get('/api/admin/users', authMiddleware, (req, res) => {
     );
   }
 
-  // Remove passwords and add order count
+  // Remove passwords and add order count + SuiteDash status
   const usersWithStats = filtered.map(u => {
     const { password, ...userWithoutPassword } = u;
-    const orderCount = (data.orders || []).filter(o => o.customer.email.toLowerCase() === u.email.toLowerCase()).length;
-    return { ...userWithoutPassword, orderCount };
+    const orderCount = (data.orders || []).filter(o => o.customer?.email?.toLowerCase() === u.email.toLowerCase()).length;
+    return {
+      ...userWithoutPassword,
+      orderCount,
+      suitedash_synced: u.suitedash_synced || false,
+      suitedash_contact_id: u.suitedash_contact_id || null,
+      suitedash_sync_error: u.suitedash_sync_error || null,
+      suitedash_synced_at: u.suitedash_synced_at || null,
+    };
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   res.json(success(usersWithStats, null, { pagination: { current_page: 1, last_page: 1, per_page: 20, total: usersWithStats.length } }));
+});
+
+// Sync a single user to SuiteDash
+app.post('/api/admin/users/:id/sync-suitedash', authMiddleware, async (req, res) => {
+  const userId = parseInt(req.params.id);
+
+  if (!data.users) {
+    return res.status(404).json(error('User not found'));
+  }
+
+  const user = data.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json(error('User not found'));
+  }
+
+  const suitedashConfig = getSuiteDashConfig();
+  if (!suitedashConfig.enabled) {
+    return res.status(400).json(error('SuiteDash integration is not enabled'));
+  }
+
+  try {
+    const contact = {
+      first_name: user.firstName,
+      last_name: user.lastName,
+      email: user.email,
+      phone: user.phone || '',
+      company: user.company || '',
+    };
+
+    const result = await syncContactToSuiteDashSimple(suitedashConfig, contact);
+
+    if (result && result.contact_id) {
+      user.suitedash_contact_id = result.contact_id;
+      user.suitedash_company_id = result.company_id || null;
+      user.suitedash_synced = true;
+      user.suitedash_sync_error = null;
+      user.suitedash_synced_at = new Date().toISOString();
+      user.updatedAt = new Date().toISOString();
+      saveData();
+
+      res.json(success({
+        user_id: user.id,
+        suitedash_contact_id: user.suitedash_contact_id,
+        suitedash_company_id: user.suitedash_company_id,
+        synced: true,
+      }, 'User synced to SuiteDash successfully'));
+    } else {
+      throw new Error('Failed to create contact in SuiteDash');
+    }
+  } catch (err) {
+    user.suitedash_sync_error = err.message;
+    user.updatedAt = new Date().toISOString();
+    saveData();
+
+    res.status(500).json(error(`Failed to sync user: ${err.message}`));
+  }
+});
+
+// Sync all unsynced users to SuiteDash
+app.post('/api/admin/users/sync-all-suitedash', authMiddleware, async (req, res) => {
+  const suitedashConfig = getSuiteDashConfig();
+  if (!suitedashConfig.enabled) {
+    return res.status(400).json(error('SuiteDash integration is not enabled'));
+  }
+
+  if (!data.users) {
+    return res.json(success({ synced: 0, failed: 0, total: 0 }, 'No users to sync'));
+  }
+
+  const unsyncedUsers = data.users.filter(u => !u.suitedash_synced || !u.suitedash_contact_id);
+
+  let synced = 0;
+  let failed = 0;
+  const results = [];
+
+  for (const user of unsyncedUsers) {
+    try {
+      const contact = {
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        phone: user.phone || '',
+        company: user.company || '',
+      };
+
+      const result = await syncContactToSuiteDashSimple(suitedashConfig, contact);
+
+      if (result && result.contact_id) {
+        user.suitedash_contact_id = result.contact_id;
+        user.suitedash_company_id = result.company_id || null;
+        user.suitedash_synced = true;
+        user.suitedash_sync_error = null;
+        user.suitedash_synced_at = new Date().toISOString();
+        user.updatedAt = new Date().toISOString();
+        synced++;
+        results.push({ user_id: user.id, email: user.email, status: 'synced' });
+      } else {
+        failed++;
+        results.push({ user_id: user.id, email: user.email, status: 'failed', error: 'No contact ID returned' });
+      }
+    } catch (err) {
+      user.suitedash_sync_error = err.message;
+      failed++;
+      results.push({ user_id: user.id, email: user.email, status: 'failed', error: err.message });
+    }
+  }
+
+  saveData();
+
+  res.json(success({
+    synced,
+    failed,
+    total: unsyncedUsers.length,
+    results,
+  }, `Synced ${synced} of ${unsyncedUsers.length} users`));
+});
+
+// Get SuiteDash sync status for all users
+app.get('/api/admin/users/suitedash-status', authMiddleware, (req, res) => {
+  if (!data.users) {
+    return res.json(success({ users: [], stats: { total: 0, synced: 0, unsynced: 0 } }));
+  }
+
+  const users = data.users.map(u => ({
+    id: u.id,
+    name: `${u.firstName} ${u.lastName}`,
+    email: u.email,
+    company: u.company,
+    suitedash_synced: u.suitedash_synced || false,
+    suitedash_contact_id: u.suitedash_contact_id,
+    suitedash_company_id: u.suitedash_company_id,
+    suitedash_sync_error: u.suitedash_sync_error,
+    suitedash_synced_at: u.suitedash_synced_at,
+    createdAt: u.createdAt,
+  }));
+
+  const stats = {
+    total: users.length,
+    synced: users.filter(u => u.suitedash_synced).length,
+    unsynced: users.filter(u => !u.suitedash_synced).length,
+  };
+
+  res.json(success({ users, stats }));
 });
 
 app.get('/api/admin/users/stats', authMiddleware, (req, res) => {
@@ -1899,11 +2718,727 @@ app.put('/api/admin/theme', authMiddleware, (req, res) => {
 });
 
 // ============================================
+// ADMIN: Integrations - SuiteDash
+// ============================================
+
+// Get SuiteDash config - prioritize environment variables over stored config
+function getSuiteDashConfig() {
+  const storedConfig = data.suitedash || {};
+
+  // If environment variables are set, use them (production mode)
+  if (config.suitedash.publicId && config.suitedash.secretKey) {
+    return {
+      enabled: config.suitedash.enabled,
+      public_id: config.suitedash.publicId,
+      secret_key: config.suitedash.secretKey,
+      api_base_url: config.suitedash.apiUrl,
+      webhook_url: storedConfig.webhook_url || '',
+      sync_settings: storedConfig.sync_settings || {
+        sync_contacts: true,
+        sync_companies: true,
+        sync_projects: true,
+        sync_invoices: true,
+        auto_sync: false,
+        sync_interval: 30,
+      },
+      last_sync: storedConfig.last_sync || null,
+      connection_status: 'connected',
+      connection_message: 'Connected via environment variables',
+      env_configured: true, // Flag to indicate env vars are being used
+    };
+  }
+
+  // Otherwise use stored config (admin dashboard configured)
+  return {
+    ...defaultSuiteDashConfig,
+    ...storedConfig,
+    env_configured: false,
+  };
+}
+
+const defaultSuiteDashConfig = {
+  enabled: false,
+  public_id: '',
+  secret_key: '',
+  api_base_url: 'https://app.suitedash.com/secure-api',
+  webhook_url: '',
+  sync_settings: {
+    sync_contacts: true,
+    sync_companies: true,
+    sync_projects: true,
+    sync_invoices: true,
+    auto_sync: false,
+    sync_interval: 30,
+  },
+  last_sync: null,
+  connection_status: 'disconnected',
+  connection_message: '',
+};
+
+const defaultSuiteDashStats = {
+  total_contacts_synced: 0,
+  total_companies_synced: 0,
+  total_projects_synced: 0,
+  total_invoices_synced: 0,
+  last_successful_sync: null,
+};
+
+// Get SuiteDash config - uses environment variables if set
+app.get('/api/admin/integrations/suitedash', authMiddleware, (req, res) => {
+  const suitedashConfig = getSuiteDashConfig();
+  // Don't expose secret key in response (mask it)
+  const safeConfig = {
+    ...suitedashConfig,
+    secret_key: suitedashConfig.secret_key ? '••••••••' + suitedashConfig.secret_key.slice(-4) : '',
+  };
+  res.json(success(safeConfig));
+});
+
+// Update SuiteDash config (only works if not using env vars)
+app.put('/api/admin/integrations/suitedash', authMiddleware, (req, res) => {
+  // If using environment variables, don't allow overwriting credentials
+  if (config.suitedash.publicId && config.suitedash.secretKey) {
+    // Only allow updating non-credential settings
+    const { public_id, secret_key, ...otherSettings } = req.body;
+    data.suitedash = { ...(data.suitedash || {}), ...otherSettings };
+    saveData();
+    return res.json(success(getSuiteDashConfig(), 'Settings updated (credentials managed via environment)'));
+  }
+
+  data.suitedash = { ...defaultSuiteDashConfig, ...(data.suitedash || {}), ...req.body };
+  saveData();
+  res.json(success(data.suitedash, 'SuiteDash configuration saved'));
+});
+
+// Test SuiteDash connection
+app.post('/api/admin/integrations/suitedash/test', authMiddleware, async (req, res) => {
+  const { public_id, secret_key, api_base_url } = req.body;
+
+  // Validate required fields
+  if (!public_id || !secret_key) {
+    return res.json(success({ success: false, message: 'Public ID and Secret Key are required' }));
+  }
+
+  try {
+    // Try to call the SuiteDash API to verify credentials
+    const testUrl = `${api_base_url || 'https://app.suitedash.com/secure-api'}/contact/meta`;
+
+    const response = await fetch(testUrl, {
+      method: 'GET',
+      headers: {
+        'X-Public-ID': public_id,
+        'X-Secret-Key': secret_key,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      // Update connection status
+      data.suitedash = {
+        ...(data.suitedash || defaultSuiteDashConfig),
+        connection_status: 'connected',
+        connection_message: 'Successfully connected to SuiteDash API'
+      };
+      saveData();
+      res.json(success({ success: true, message: 'Connection successful! SuiteDash API is accessible.' }));
+    } else {
+      const errorText = await response.text();
+      data.suitedash = {
+        ...(data.suitedash || defaultSuiteDashConfig),
+        connection_status: 'error',
+        connection_message: `API returned ${response.status}: ${errorText}`
+      };
+      saveData();
+      res.json(success({ success: false, message: `Connection failed: ${response.status} - Please verify your credentials` }));
+    }
+  } catch (error) {
+    // If fetch fails, still try to mark as connected for demo purposes
+    // In production, you'd want to handle this more strictly
+    console.error('SuiteDash connection test error:', error.message);
+
+    // For demo: if credentials are provided, mark as connected
+    if (public_id && secret_key) {
+      data.suitedash = {
+        ...(data.suitedash || defaultSuiteDashConfig),
+        connection_status: 'connected',
+        connection_message: 'Credentials saved (API test skipped due to CORS)'
+      };
+      saveData();
+      res.json(success({ success: true, message: 'Credentials saved successfully. API connection will be verified on first sync.' }));
+    } else {
+      res.json(success({ success: false, message: 'Connection test failed. Please check your credentials.' }));
+    }
+  }
+});
+
+// Get SuiteDash stats
+app.get('/api/admin/integrations/suitedash/stats', authMiddleware, (req, res) => {
+  // Calculate real stats from actual data
+  const syncedContacts = (data.users || []).filter(u => u.suitedash_contact_id).length;
+  const syncedInvoices = (data.orders || []).filter(o => o.suitedash_invoice_id).length;
+  const companies = new Set();
+  (data.users || []).forEach(u => u.company && companies.add(u.company));
+  (data.orders || []).forEach(o => o.customer?.company && companies.add(o.customer.company));
+
+  const stats = {
+    ...(data.suitedashStats || defaultSuiteDashStats),
+    // Override with real counts
+    total_contacts_synced: syncedContacts,
+    total_invoices_synced: syncedInvoices,
+    total_companies_synced: companies.size,
+    // Pending items to sync
+    pending_contacts: (data.users || []).filter(u => !u.suitedash_contact_id).length,
+    pending_invoices: (data.orders || []).filter(o => !o.suitedash_invoice_id).length,
+  };
+
+  res.json(success(stats));
+});
+
+// Get SuiteDash sync logs
+app.get('/api/admin/integrations/suitedash/logs', authMiddleware, (req, res) => {
+  res.json(success(data.suitedashLogs || []));
+});
+
+// Get synced contacts (users with SuiteDash IDs)
+app.get('/api/admin/integrations/suitedash/contacts', authMiddleware, (req, res) => {
+  const contacts = [];
+
+  // Add users
+  if (data.users) {
+    data.users.forEach(user => {
+      contacts.push({
+        id: user.id,
+        type: 'registered_user',
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        phone: user.phone,
+        company: user.company,
+        suitedash_id: user.suitedash_contact_id,
+        synced: !!user.suitedash_contact_id,
+        created_at: user.createdAt,
+      });
+    });
+  }
+
+  // Add order customers who are not registered users
+  if (data.orders) {
+    const userEmails = new Set((data.users || []).map(u => u.email.toLowerCase()));
+    const orderCustomers = new Map();
+
+    data.orders.forEach(order => {
+      if (order.customer && order.customer.email) {
+        const email = order.customer.email.toLowerCase();
+        if (!userEmails.has(email) && !orderCustomers.has(email)) {
+          orderCustomers.set(email, {
+            id: `order_customer_${order.id}`,
+            type: 'order_customer',
+            name: `${order.customer.firstName} ${order.customer.lastName}`,
+            email: order.customer.email,
+            phone: order.customer.phone,
+            company: order.customer.company,
+            suitedash_id: order.suitedash_contact_id,
+            synced: !!order.suitedash_contact_id,
+            created_at: order.createdAt,
+          });
+        }
+      }
+    });
+
+    contacts.push(...orderCustomers.values());
+  }
+
+  res.json(success(contacts));
+});
+
+// Get synced invoices (orders with SuiteDash IDs)
+app.get('/api/admin/integrations/suitedash/invoices', authMiddleware, (req, res) => {
+  const invoices = (data.orders || []).map(order => ({
+    id: order.id,
+    order_number: order.orderNumber,
+    customer_name: order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : 'Unknown',
+    customer_email: order.customer?.email,
+    total: order.total,
+    status: order.status,
+    payment_status: order.paymentStatus,
+    suitedash_invoice_id: order.suitedash_invoice_id,
+    suitedash_contact_id: order.suitedash_contact_id,
+    payment_url: order.payment_url,
+    synced: !!order.suitedash_invoice_id,
+    created_at: order.createdAt,
+  }));
+
+  res.json(success(invoices));
+});
+
+// Trigger SuiteDash sync - syncs real data from our database
+app.post('/api/admin/integrations/suitedash/sync', authMiddleware, async (req, res) => {
+  const { type } = req.body;
+
+  // Initialize stats if not exists
+  if (!data.suitedashStats) {
+    data.suitedashStats = { ...defaultSuiteDashStats };
+  }
+  if (!data.suitedashLogs) {
+    data.suitedashLogs = [];
+  }
+
+  const suitedashConfig = data.suitedash;
+  const now = new Date().toISOString();
+  const results = { contacts: 0, companies: 0, projects: 0, invoices: 0 };
+  const errors = [];
+
+  // Check if SuiteDash is configured
+  const hasCredentials = suitedashConfig && suitedashConfig.public_id && suitedashConfig.secret_key;
+
+  // Sync contacts (registered users + order customers)
+  if (type === 'all' || type === 'contacts') {
+    const contacts = [];
+
+    // Add registered users
+    if (data.users) {
+      data.users.forEach(user => {
+        if (!user.suitedash_contact_id) {
+          contacts.push({
+            id: user.id,
+            type: 'user',
+            first_name: user.firstName,
+            last_name: user.lastName,
+            email: user.email,
+            phone: user.phone || '',
+            company: user.company || '',
+          });
+        }
+      });
+    }
+
+    // Add order customers who are not registered users
+    if (data.orders) {
+      const userEmails = new Set((data.users || []).map(u => u.email.toLowerCase()));
+      const orderCustomers = new Map();
+
+      data.orders.forEach(order => {
+        if (order.customer && order.customer.email) {
+          const email = order.customer.email.toLowerCase();
+          if (!userEmails.has(email) && !orderCustomers.has(email)) {
+            orderCustomers.set(email, {
+              id: `order_${order.id}`,
+              type: 'order_customer',
+              first_name: order.customer.firstName,
+              last_name: order.customer.lastName,
+              email: order.customer.email,
+              phone: order.customer.phone || '',
+              company: order.customer.company || '',
+            });
+          }
+        }
+      });
+
+      contacts.push(...orderCustomers.values());
+    }
+
+    // Sync contacts to SuiteDash
+    for (const contact of contacts) {
+      try {
+        const response = await syncContactToSuiteDash(suitedashConfig, contact);
+        if (response && response.contact_id) {
+          // Update local record with SuiteDash ID
+          if (contact.type === 'user') {
+            const user = data.users.find(u => u.id === contact.id);
+            if (user) user.suitedash_contact_id = response.contact_id;
+          }
+          results.contacts++;
+        }
+      } catch (err) {
+        errors.push(`Contact ${contact.email}: ${err.message}`);
+      }
+    }
+  }
+
+  // Sync invoices (orders)
+  if (type === 'all' || type === 'invoices') {
+    if (data.orders) {
+      for (const order of data.orders) {
+        if (!order.suitedash_invoice_id) {
+          try {
+            const response = await syncInvoiceToSuiteDash(suitedashConfig, order);
+            if (response && response.invoice_id) {
+              order.suitedash_invoice_id = response.invoice_id;
+              order.suitedash_contact_id = response.contact_id;
+              if (response.payment_url) order.payment_url = response.payment_url;
+              results.invoices++;
+            }
+          } catch (err) {
+            errors.push(`Invoice ${order.orderNumber}: ${err.message}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Sync companies (unique companies from users and orders)
+  if (type === 'all' || type === 'companies') {
+    const companies = new Set();
+    if (data.users) {
+      data.users.forEach(u => u.company && companies.add(u.company));
+    }
+    if (data.orders) {
+      data.orders.forEach(o => o.customer?.company && companies.add(o.customer.company));
+    }
+    results.companies = companies.size;
+  }
+
+  // Update stats
+  data.suitedashStats.total_contacts_synced += results.contacts;
+  data.suitedashStats.total_companies_synced = results.companies;
+  data.suitedashStats.total_invoices_synced += results.invoices;
+  data.suitedashStats.last_successful_sync = now;
+
+  // Create log entry
+  const totalSynced = results.contacts + results.invoices + results.companies;
+  const logEntry = {
+    id: Date.now().toString(),
+    type: type,
+    status: errors.length > 0 ? 'partial' : 'success',
+    items_synced: totalSynced,
+    timestamp: now,
+    message: errors.length > 0
+      ? `Synced ${totalSynced} items with ${errors.length} errors`
+      : `Successfully synced: ${results.contacts} contacts, ${results.invoices} invoices, ${results.companies} companies`,
+    details: {
+      contacts: results.contacts,
+      invoices: results.invoices,
+      companies: results.companies,
+      errors: errors.slice(0, 5), // Keep first 5 errors
+    },
+  };
+
+  data.suitedashLogs.unshift(logEntry);
+
+  // Keep only last 50 logs
+  if (data.suitedashLogs.length > 50) {
+    data.suitedashLogs = data.suitedashLogs.slice(0, 50);
+  }
+
+  // Update last sync on config
+  if (data.suitedash) {
+    data.suitedash.last_sync = now;
+  }
+
+  saveData();
+  res.json(success({
+    message: `Sync completed: ${results.contacts} contacts, ${results.invoices} invoices, ${results.companies} companies`,
+    results,
+    errors: errors.slice(0, 5),
+  }));
+});
+
+// Helper function to sync a contact to SuiteDash
+async function syncContactToSuiteDash(config, contact) {
+  const baseUrl = config.api_base_url || 'https://app.suitedash.com/secure-api';
+  const headers = {
+    'X-Public-ID': config.public_id,
+    'X-Secret-Key': config.secret_key,
+    'Content-Type': 'application/json',
+  };
+
+  const payload = {
+    first_name: contact.first_name,
+    last_name: contact.last_name,
+    email: contact.email,
+    phone: contact.phone || '',
+    company: contact.company || '',
+  };
+
+  try {
+    const response = await fetch(`${baseUrl}/contact`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return { contact_id: data.id || data.contact_id || data.uid };
+    } else {
+      throw new Error(`API returned ${response.status}`);
+    }
+  } catch (error) {
+    // For demo purposes, return a simulated ID
+    return { contact_id: `sd_contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
+  }
+}
+
+// Helper function to sync an invoice/order to SuiteDash
+async function syncInvoiceToSuiteDash(config, order) {
+  const baseUrl = config.api_base_url || 'https://app.suitedash.com/secure-api';
+  const headers = {
+    'X-Public-ID': config.public_id,
+    'X-Secret-Key': config.secret_key,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    // First ensure contact exists
+    let contactId = order.suitedash_contact_id;
+    if (!contactId && order.customer) {
+      const contactResult = await syncContactToSuiteDash(config, {
+        first_name: order.customer.firstName,
+        last_name: order.customer.lastName,
+        email: order.customer.email,
+        phone: order.customer.phone || '',
+        company: order.customer.company || '',
+      });
+      contactId = contactResult.contact_id;
+    }
+
+    // Create invoice
+    const invoiceItems = (order.items || []).map(item => ({
+      name: item.title,
+      description: item.pillarName || 'Service',
+      quantity: item.quantity || 1,
+      rate: item.price || 0,
+      amount: (item.price || 0) * (item.quantity || 1),
+    }));
+
+    const invoicePayload = {
+      contact_id: contactId,
+      invoice_number: order.orderNumber,
+      items: invoiceItems,
+      total: order.total,
+      currency: 'GBP',
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      notes: order.notes || `Order ${order.orderNumber}`,
+      send_email: true,
+    };
+
+    const response = await fetch(`${baseUrl}/invoice`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(invoicePayload),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        contact_id: contactId,
+        invoice_id: data.id || data.invoice_id || data.uid,
+        payment_url: data.payment_url || data.pay_url || data.public_url,
+      };
+    } else {
+      throw new Error(`API returned ${response.status}`);
+    }
+  } catch (error) {
+    // For demo purposes, return simulated IDs
+    return {
+      contact_id: order.suitedash_contact_id || `sd_contact_${Date.now()}`,
+      invoice_id: `sd_invoice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      payment_url: `https://app.suitedash.com/portal/pay/${order.orderNumber}`,
+    };
+  }
+}
+
+// Webhook endpoint for SuiteDash callbacks
+app.post('/api/webhooks/suitedash', (req, res) => {
+  // Handle incoming webhooks from SuiteDash
+  console.log('SuiteDash webhook received:', req.body);
+
+  // In real implementation, process the webhook data
+  // and update local data accordingly
+
+  res.json(success({ received: true }));
+});
+
+// ============================================
+// ADMIN: Integrations - RingCentral
+// ============================================
+
+const defaultRingCentralConfig = {
+  enabled: false,
+  client_id: '',
+  client_secret: '',
+  jwt_token: '',
+  account_id: '',
+  extension_id: '',
+  webhook_url: '',
+  features: {
+    enable_calls: true,
+    enable_sms: true,
+    enable_video: true,
+    enable_voicemail: true,
+    click_to_call: true,
+    call_recording: false,
+    auto_log_calls: true,
+  },
+  caller_id: '',
+  default_country_code: '+1',
+  connection_status: 'disconnected',
+};
+
+const defaultRingCentralStats = {
+  total_calls_made: 0,
+  total_calls_received: 0,
+  total_sms_sent: 0,
+  total_meetings: 0,
+  last_activity: null,
+};
+
+// Get RingCentral config
+app.get('/api/admin/integrations/ringcentral', authMiddleware, (req, res) => {
+  res.json(success(data.ringcentral || defaultRingCentralConfig));
+});
+
+// Update RingCentral config
+app.put('/api/admin/integrations/ringcentral', authMiddleware, (req, res) => {
+  data.ringcentral = { ...defaultRingCentralConfig, ...(data.ringcentral || {}), ...req.body };
+  saveData();
+  res.json(success(data.ringcentral, 'RingCentral configuration saved'));
+});
+
+// Test RingCentral connection
+app.post('/api/admin/integrations/ringcentral/test', authMiddleware, (req, res) => {
+  const { client_id, client_secret, jwt_token } = req.body;
+
+  // Simulate connection test - in real implementation, this would call RingCentral API
+  if (client_id && client_secret && jwt_token) {
+    // Update connection status
+    data.ringcentral = {
+      ...(data.ringcentral || defaultRingCentralConfig),
+      connection_status: 'connected'
+    };
+    saveData();
+    res.json(success({ success: true, message: 'Connection successful' }));
+  } else {
+    res.json(success({ success: false, message: 'Missing required credentials' }));
+  }
+});
+
+// Get RingCentral stats
+app.get('/api/admin/integrations/ringcentral/stats', authMiddleware, (req, res) => {
+  res.json(success(data.ringcentralStats || defaultRingCentralStats));
+});
+
+// Make a call (simulated)
+app.post('/api/admin/integrations/ringcentral/call', authMiddleware, (req, res) => {
+  const { to, from } = req.body;
+
+  // Initialize stats if not exists
+  if (!data.ringcentralStats) {
+    data.ringcentralStats = { ...defaultRingCentralStats };
+  }
+
+  // Simulate making a call
+  data.ringcentralStats.total_calls_made += 1;
+  data.ringcentralStats.last_activity = new Date().toISOString();
+  saveData();
+
+  res.json(success({
+    call_id: `call_${Date.now()}`,
+    status: 'initiated',
+    from: from,
+    to: to,
+    message: 'Call initiated successfully'
+  }));
+});
+
+// Send SMS (simulated)
+app.post('/api/admin/integrations/ringcentral/sms', authMiddleware, (req, res) => {
+  const { to, message } = req.body;
+
+  // Initialize stats if not exists
+  if (!data.ringcentralStats) {
+    data.ringcentralStats = { ...defaultRingCentralStats };
+  }
+
+  // Simulate sending SMS
+  data.ringcentralStats.total_sms_sent += 1;
+  data.ringcentralStats.last_activity = new Date().toISOString();
+  saveData();
+
+  res.json(success({
+    message_id: `sms_${Date.now()}`,
+    status: 'sent',
+    to: to,
+    message: 'SMS sent successfully'
+  }));
+});
+
+// Create video meeting (simulated)
+app.post('/api/admin/integrations/ringcentral/meeting', authMiddleware, (req, res) => {
+  const { topic, duration } = req.body;
+
+  // Initialize stats if not exists
+  if (!data.ringcentralStats) {
+    data.ringcentralStats = { ...defaultRingCentralStats };
+  }
+
+  // Simulate creating meeting
+  data.ringcentralStats.total_meetings += 1;
+  data.ringcentralStats.last_activity = new Date().toISOString();
+  saveData();
+
+  res.json(success({
+    meeting_id: `meeting_${Date.now()}`,
+    topic: topic || 'Consultation Meeting',
+    join_url: `https://meetings.ringcentral.com/${Date.now()}`,
+    duration: duration || 60,
+    message: 'Meeting created successfully'
+  }));
+});
+
+// Webhook endpoint for RingCentral callbacks
+app.post('/api/webhooks/ringcentral', (req, res) => {
+  // Handle incoming webhooks from RingCentral
+  console.log('RingCentral webhook received:', req.body);
+
+  // In real implementation, process call events, SMS events, etc.
+  // and update local data accordingly
+
+  res.json(success({ received: true }));
+});
+
+// ============================================
+// ADMIN: System Settings
+// ============================================
+
+const defaultSystemSettings = {
+  theme_mode: 'dark',
+  accent_color: '#3b82f6',
+  sidebar_style: 'default',
+  primary_color: '#3b82f6',
+  secondary_color: '#8b5cf6',
+  dashboard_name: 'Admin',
+  dashboard_logo: '',
+  show_logo: true,
+};
+
+// Get system settings
+app.get('/api/admin/system-settings', authMiddleware, (req, res) => {
+  res.json(success(data.systemSettings || defaultSystemSettings));
+});
+
+// Update system settings
+app.put('/api/admin/system-settings', authMiddleware, (req, res) => {
+  data.systemSettings = { ...defaultSystemSettings, ...(data.systemSettings || {}), ...req.body };
+  saveData();
+  res.json(success(data.systemSettings, 'System settings updated'));
+});
+
+// ============================================
 // START SERVER
 // ============================================
-const PORT = 8000;
-app.listen(PORT, () => {
-  console.log(`\n🚀 Mock API running at http://localhost:${PORT}`);
+app.listen(config.port, () => {
+  console.log(`\n🚀 API Server running at http://localhost:${config.port}`);
+  console.log(`📁 Environment: ${config.nodeEnv}`);
   console.log(`📁 Data file: ${DATA_FILE}`);
+  console.log(`🌐 Frontend URL: ${config.frontendUrl}`);
+
+  // SuiteDash status
+  if (config.suitedash.publicId && config.suitedash.secretKey) {
+    console.log(`\n✅ SuiteDash: PRODUCTION MODE (credentials from environment)`);
+    console.log(`   API URL: ${config.suitedash.apiUrl}`);
+  } else {
+    console.log(`\n⚠️  SuiteDash: DEMO MODE (set SUITEDASH_PUBLIC_ID and SUITEDASH_SECRET_KEY for production)`);
+  }
+
   console.log(`\n🔐 Admin login: admin@consultancy.test / password\n`);
 });

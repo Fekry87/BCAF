@@ -133,14 +133,26 @@ export function AdminTheme() {
   const updateMutation = useMutation({
     mutationFn: (data: ThemeFormValues) =>
       put<ThemeConfig>('/admin/theme', data),
-    onSuccess: (_, variables) => {
-      // Update theme globally via context (this applies to entire app instantly)
-      updateTheme(variables);
-      // Also apply to DOM directly for immediate visual feedback
-      applyThemeToDOM(variables);
-      // Invalidate cache so data stays in sync
+    onSuccess: (response, variables) => {
+      // Use the API response data if available, otherwise use submitted values
+      const savedTheme = response?.data || variables;
+      // Merge with defaults to ensure all values are present
+      const fullTheme = { ...defaultTheme, ...savedTheme };
+
+      // Apply to DOM immediately for instant visual feedback
+      applyThemeToDOM(fullTheme);
+
+      // Update theme globally via context
+      updateTheme(fullTheme);
+
+      // Update query cache directly with the new values
+      queryClient.setQueryData(['theme'], { data: fullTheme, success: true });
+      queryClient.setQueryData(['admin', 'theme'], { data: fullTheme, success: true });
+
+      // Also invalidate to ensure fresh data on next fetch
       queryClient.invalidateQueries({ queryKey: ['theme'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'theme'] });
+
       toast.success('Theme updated successfully');
     },
     onError: () => {

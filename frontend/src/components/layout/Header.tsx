@@ -6,6 +6,7 @@ import { Menu, X, User, LogOut, ChevronDown } from 'lucide-react';
 import { pillarsApi } from '@/services/pillars';
 import { get } from '@/services/api';
 import { useUserAuth } from '@/contexts/UserAuthContext';
+import { useWebsiteSettings } from '@/contexts/WebsiteSettingsContext';
 import { CartButton, CartDrawer } from './Cart';
 
 interface HeaderContent {
@@ -19,6 +20,7 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { user, isAuthenticated, signOut, openSignIn, openSignUp } = useUserAuth();
+  const { isPageVisible } = useWebsiteSettings();
 
   const { data: pillarsData } = useQuery({
     queryKey: ['pillars'],
@@ -35,13 +37,25 @@ export function Header() {
   const logoText = headerContent?.logo_text || 'Consultancy';
   const logoImage = headerContent?.logo_image || null;
 
-  // Build navigation links dynamically from pillars
+  // Map routes to page visibility keys
+  const routeToPageKey: Record<string, 'home' | 'about' | 'contact'> = {
+    '/': 'home',
+    '/about': 'about',
+    '/contact': 'contact',
+  };
+
+  // Build navigation links dynamically from pillars, filtering out hidden pages
   const navLinks = [
     { to: '/', label: 'Home' },
     ...pillars.map(p => ({ to: `/${p.slug}`, label: p.name })),
     { to: '/about', label: 'About' },
     { to: '/contact', label: 'Contact' },
-  ];
+  ].filter(link => {
+    const pageKey = routeToPageKey[link.to];
+    // If it's a pillar link or page visibility check passes, show it
+    if (!pageKey) return true;
+    return isPageVisible(pageKey);
+  });
 
   useEffect(() => {
     const handleScroll = () => {

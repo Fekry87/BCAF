@@ -37,7 +37,7 @@ export function ServiceCard({ service, pillarName, pillarSlug }: ServiceCardProp
 
   return (
     <div className={clsx(
-      'card group',
+      'card group flex flex-col h-full',
       isExpanded && 'ring-2 ring-primary-400'
     )}>
       {/* Header */}
@@ -69,9 +69,8 @@ export function ServiceCard({ service, pillarName, pillarSlug }: ServiceCardProp
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="mt-4 flex items-center justify-between">
-        {/* Expand/Collapse Button - Left side */}
+      {/* Details Toggle */}
+      <div className="mt-4">
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -84,15 +83,33 @@ export function ServiceCard({ service, pillarName, pillarSlug }: ServiceCardProp
             isExpanded && 'rotate-180'
           )} />
         </button>
+      </div>
 
-        {/* Add to Cart / Contact Us - Right side */}
+      {/* Expandable Content */}
+      <div className={clsx(
+        'overflow-hidden transition-all duration-300 ease-accordion',
+        isExpanded ? 'max-h-[500px] mt-4 pt-4 border-t border-neutral-200' : 'max-h-0'
+      )}>
+        {service.details && (
+          <div
+            className="prose prose-sm max-w-none text-neutral-700"
+            dangerouslySetInnerHTML={{ __html: service.details }}
+          />
+        )}
+      </div>
+
+      {/* Spacer to push CTA to bottom */}
+      <div className="flex-1" />
+
+      {/* CTA Button - Full Width at Bottom */}
+      <div className="mt-4 pt-4 border-t border-neutral-200">
         {service.type === 'one_off' ? (
           <button
             type="button"
             onClick={handleAddToCart}
             disabled={inCart}
             className={clsx(
-              'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
+              'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
               inCart
                 ? 'bg-green-100 text-green-700 cursor-default'
                 : 'bg-accent-yellow text-primary-900 hover:bg-yellow-400'
@@ -113,24 +130,11 @@ export function ServiceCard({ service, pillarName, pillarSlug }: ServiceCardProp
         ) : (
           <Link
             to="/contact"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-primary-700 text-white hover:bg-primary-800 transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium bg-primary-700 text-white hover:bg-primary-800 transition-all"
           >
             <MessageSquare className="h-4 w-4" />
             Contact Us
           </Link>
-        )}
-      </div>
-
-      {/* Expandable Content */}
-      <div className={clsx(
-        'overflow-hidden transition-all duration-300 ease-accordion',
-        isExpanded ? 'max-h-[500px] mt-4 pt-4 border-t border-neutral-200' : 'max-h-0'
-      )}>
-        {service.details && (
-          <div
-            className="prose prose-sm max-w-none text-neutral-700"
-            dangerouslySetInnerHTML={{ __html: service.details }}
-          />
         )}
       </div>
     </div>

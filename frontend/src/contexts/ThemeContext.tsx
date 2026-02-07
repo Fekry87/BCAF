@@ -63,34 +63,37 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // Export this function so it can be used elsewhere
-export function applyThemeToDOM(theme: ThemeConfig) {
+export function applyThemeToDOM(theme: Partial<ThemeConfig>) {
   const root = document.documentElement;
 
+  // Merge with defaults to ensure all values are present
+  const fullTheme = { ...defaultTheme, ...theme };
+
   // Apply primary colors
-  root.style.setProperty('--color-primary-900', theme.primary_900);
-  root.style.setProperty('--color-primary-800', theme.primary_800);
-  root.style.setProperty('--color-primary-700', theme.primary_700);
-  root.style.setProperty('--color-primary-600', theme.primary_600);
-  root.style.setProperty('--color-primary-500', theme.primary_500);
-  root.style.setProperty('--color-primary-400', theme.primary_400);
-  root.style.setProperty('--color-primary-100', theme.primary_100);
-  root.style.setProperty('--color-primary-50', theme.primary_50);
+  root.style.setProperty('--color-primary-900', fullTheme.primary_900);
+  root.style.setProperty('--color-primary-800', fullTheme.primary_800);
+  root.style.setProperty('--color-primary-700', fullTheme.primary_700);
+  root.style.setProperty('--color-primary-600', fullTheme.primary_600);
+  root.style.setProperty('--color-primary-500', fullTheme.primary_500);
+  root.style.setProperty('--color-primary-400', fullTheme.primary_400);
+  root.style.setProperty('--color-primary-100', fullTheme.primary_100);
+  root.style.setProperty('--color-primary-50', fullTheme.primary_50);
 
   // Apply accent colors
-  root.style.setProperty('--color-accent-yellow', theme.accent_yellow);
-  root.style.setProperty('--color-accent-yellow-light', theme.accent_yellow_light);
+  root.style.setProperty('--color-accent-yellow', fullTheme.accent_yellow);
+  root.style.setProperty('--color-accent-yellow-light', fullTheme.accent_yellow_light);
 
   // Apply CTA colors
-  root.style.setProperty('--color-cta-primary-bg', theme.cta_primary_bg);
-  root.style.setProperty('--color-cta-primary-text', theme.cta_primary_text);
-  root.style.setProperty('--color-cta-primary-hover', theme.cta_primary_hover);
+  root.style.setProperty('--color-cta-primary-bg', fullTheme.cta_primary_bg);
+  root.style.setProperty('--color-cta-primary-text', fullTheme.cta_primary_text);
+  root.style.setProperty('--color-cta-primary-hover', fullTheme.cta_primary_hover);
 
   // Apply typography
-  root.style.setProperty('--font-heading', theme.font_heading);
-  root.style.setProperty('--font-body', theme.font_body);
+  root.style.setProperty('--font-heading', fullTheme.font_heading);
+  root.style.setProperty('--font-body', fullTheme.font_body);
 
   // Apply border radius
-  root.style.setProperty('--radius-md', theme.border_radius);
+  root.style.setProperty('--radius-md', fullTheme.border_radius);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

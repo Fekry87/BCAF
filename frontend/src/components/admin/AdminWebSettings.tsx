@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -81,20 +81,12 @@ function WebsiteSettingsTab() {
     },
   });
 
-  // Initialize settings from API data
-  useState(() => {
+  // Initialize settings from API data when it loads
+  useEffect(() => {
     if (data?.data) {
       setSettings(data.data);
     }
-  });
-
-  // Update local state when data loads
-  if (data?.data && !isLoading) {
-    const serverSettings = data.data;
-    if (JSON.stringify(settings.page_visibility) !== JSON.stringify(serverSettings.page_visibility)) {
-      setSettings(serverSettings);
-    }
-  }
+  }, [data]);
 
   const togglePageVisibility = (pageKey: keyof PageVisibility) => {
     if (pageKey === 'home') {
