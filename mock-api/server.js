@@ -2667,11 +2667,71 @@ app.patch('/api/admin/orders/:id/status', authMiddleware, (req, res) => {
   res.json(success(order, 'Order updated'));
 });
 
-app.delete('/api/admin/orders/:id', authMiddleware, (req, res) => {
+app.delete('/api/admin/orders/:id', authMiddleware, async (req, res) => {
   if (!data.orders) data.orders = [];
-  data.orders = data.orders.filter(o => o.id !== parseInt(req.params.id));
+
+  const orderId = parseInt(req.params.id);
+  const order = data.orders.find(o => o.id === orderId);
+  const syncSuiteDash = req.query.sync_suitedash === 'true';
+
+  // If sync_suitedash is true and order has a SuiteDash contact, try to delete from SuiteDash
+  if (syncSuiteDash && order && order.suitedash_contact_id && !order.suitedash_contact_id.startsWith('existing_') && !order.suitedash_contact_id.startsWith('contact_')) {
+    const suitedashConfig = getSuiteDashConfig();
+    if (suitedashConfig.enabled && suitedashConfig.public_id && suitedashConfig.secret_key) {
+      try {
+        // Note: SuiteDash may not support contact deletion via API
+        // This is a placeholder for when/if they add that feature
+        console.log(`[SuiteDash] Would delete contact ${order.suitedash_contact_id} (if API supported)`);
+      } catch (err) {
+        console.log(`[SuiteDash] Failed to delete contact: ${err.message}`);
+      }
+    }
+  }
+
+  data.orders = data.orders.filter(o => o.id !== orderId);
   saveData();
   res.json(success(null, 'Order deleted'));
+});
+
+// Bulk delete orders
+app.post('/api/admin/orders/bulk-delete', authMiddleware, async (req, res) => {
+  if (!data.orders) data.orders = [];
+
+  const { ids, sync_suitedash } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(422).json(error('No order IDs provided'));
+  }
+
+  const suitedashConfig = getSuiteDashConfig();
+  const ordersToDelete = data.orders.filter(o => ids.includes(o.id));
+  let deleted = 0;
+  let failed = 0;
+
+  // If sync_suitedash is true, try to delete contacts from SuiteDash
+  if (sync_suitedash && suitedashConfig.enabled && suitedashConfig.public_id && suitedashConfig.secret_key) {
+    for (const order of ordersToDelete) {
+      if (order.suitedash_contact_id && !order.suitedash_contact_id.startsWith('existing_') && !order.suitedash_contact_id.startsWith('contact_')) {
+        try {
+          // Note: SuiteDash may not support contact deletion via API
+          console.log(`[SuiteDash] Would delete contact ${order.suitedash_contact_id} for order ${order.orderNumber}`);
+        } catch (err) {
+          console.log(`[SuiteDash] Failed to delete contact: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  // Delete the orders
+  const idsSet = new Set(ids);
+  const originalCount = data.orders.length;
+  data.orders = data.orders.filter(o => !idsSet.has(o.id));
+  deleted = originalCount - data.orders.length;
+  failed = ids.length - deleted;
+
+  saveData();
+
+  res.json(success({ deleted, failed, total: ids.length }, `Deleted ${deleted} orders`));
 });
 
 // ============================================

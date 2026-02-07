@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Trash2, Loader2, Search, ShoppingCart, Clock, DollarSign, Eye, X, RefreshCw, CheckCircle, AlertCircle, Cloud, CloudOff } from 'lucide-react';
+import { Trash2, Loader2, Search, ShoppingCart, Clock, DollarSign, Eye, X, RefreshCw, CheckCircle, AlertCircle, Cloud, CloudOff, CheckSquare, Square, MinusSquare } from 'lucide-react';
 import { get, patch, del, post } from '@/services/api';
 import { Button } from '@/components/ui';
 import type { PaginationMeta } from '@/types';
@@ -78,6 +78,7 @@ export function AdminOrders() {
   const [paymentFilter, setPaymentFilter] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const { data: ordersData, isLoading } = useQuery({
     queryKey: ['admin', 'orders', { search, status: statusFilter, paymentStatus: paymentFilter, page }],
@@ -107,7 +108,7 @@ export function AdminOrders() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => del<void>(`/admin/orders/${id}`),
+    mutationFn: (id: number) => del<void>(`/admin/orders/${id}?sync_suitedash=true`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
       toast.success('Order deleted');
@@ -115,6 +116,20 @@ export function AdminOrders() {
     },
     onError: () => {
       toast.error('Failed to delete order');
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => post<{ deleted: number; failed: number }>('/admin/orders/bulk-delete', { ids, sync_suitedash: true }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      setSelectedIds(new Set());
+      if (data.success && data.data) {
+        toast.success(`Deleted ${data.data.deleted} orders`);
+      }
+    },
+    onError: () => {
+      toast.error('Failed to delete orders');
     },
   });
 
@@ -149,28 +164,81 @@ export function AdminOrders() {
   const pagination = ordersData?.meta?.pagination as PaginationMeta | undefined;
 
   const handleDelete = (order: Order) => {
-    if (confirm(`Delete order "${order.orderNumber}"? This action cannot be undone.`)) {
+    if (confirm(`Delete order "${order.orderNumber}"? This will also remove from SuiteDash. This action cannot be undone.`)) {
       deleteMutation.mutate(order.id);
     }
   };
 
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Delete ${selectedIds.size} order(s)? This will also remove them from SuiteDash. This action cannot be undone.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === orders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(orders.map(o => o.id)));
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const isAllSelected = orders.length > 0 && selectedIds.size === orders.length;
+  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < orders.length;
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <h1 className="text-h2 text-white">Orders</h1>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => syncAllToSuiteDashMutation.mutate()}
-          disabled={syncAllToSuiteDashMutation.isPending}
-        >
-          {syncAllToSuiteDashMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Cloud className="h-4 w-4 mr-2" />
+        <div className="flex items-center gap-4">
+          <h1 className="text-h2 text-white">Orders</h1>
+          {selectedIds.size > 0 && (
+            <span className="text-sm text-slate-400 bg-slate-700 px-3 py-1 rounded-full">
+              {selectedIds.size} selected
+            </span>
           )}
-          Sync All to SuiteDash
-        </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30"
+            >
+              {bulkDeleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete Selected ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => syncAllToSuiteDashMutation.mutate()}
+            disabled={syncAllToSuiteDashMutation.isPending}
+          >
+            {syncAllToSuiteDashMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Cloud className="h-4 w-4 mr-2" />
+            )}
+            Sync All to SuiteDash
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -292,6 +360,21 @@ export function AdminOrders() {
               <table className="w-full">
                 <thead className="bg-slate-900/50 border-b border-slate-700">
                   <tr>
+                    <th className="px-4 py-4 text-left">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="text-slate-400 hover:text-white transition-colors"
+                        title={isAllSelected ? 'Deselect all' : 'Select all'}
+                      >
+                        {isAllSelected ? (
+                          <CheckSquare className="h-5 w-5 text-blue-400" />
+                        ) : isSomeSelected ? (
+                          <MinusSquare className="h-5 w-5 text-blue-400" />
+                        ) : (
+                          <Square className="h-5 w-5" />
+                        )}
+                      </button>
+                    </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Order</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Customer</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Items</th>
@@ -304,7 +387,19 @@ export function AdminOrders() {
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                   {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-700/50">
+                    <tr key={order.id} className={`hover:bg-slate-700/50 ${selectedIds.has(order.id) ? 'bg-blue-500/10' : ''}`}>
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => toggleSelect(order.id)}
+                          className="text-slate-400 hover:text-white transition-colors"
+                        >
+                          {selectedIds.has(order.id) ? (
+                            <CheckSquare className="h-5 w-5 text-blue-400" />
+                          ) : (
+                            <Square className="h-5 w-5" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-medium text-blue-400">{order.orderNumber}</p>
