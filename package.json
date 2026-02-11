@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "husky": "^9.0.11",
-    "lint-staged": "^15.2.2"
+    "lint-staged": "^15.2.2",
+    "wrangler": "^4.64.0"
   },
   "lint-staged": {
     "frontend/src/**/*.{ts,tsx}": [

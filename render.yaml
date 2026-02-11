@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bcaf-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd mock-api && npm install
+    startCommand: cd mock-api && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000

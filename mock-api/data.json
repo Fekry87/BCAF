@@ -1035,13 +1035,7 @@
       "message": "Successfully synced 49 contacts"
     }
   ],
-  "userTokens": {
-    "user-token-1770832069801-5isplihn7": {
-      "userId": 1,
-      "expiresAt": "2026-02-11T18:02:49.801Z",
-      "type": "access"
-    }
-  },
+  "userTokens": {},
   "refreshTokens": {
     "refresh-token-1770611615090-54353suc3": {
       "userId": 8,
