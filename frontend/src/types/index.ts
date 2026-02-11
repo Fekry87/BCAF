@@ -93,10 +93,31 @@ export interface ContactFormData {
   message: string;
 }
 
+// User roles
+export type UserRole = 'super_admin' | 'admin' | 'editor' | 'viewer';
+
+// Permission types
+export type Permission =
+  | 'content:read'
+  | 'content:write'
+  | 'content:delete'
+  | 'users:read'
+  | 'users:write'
+  | 'users:delete'
+  | 'orders:read'
+  | 'orders:write'
+  | 'orders:delete'
+  | 'integrations:read'
+  | 'integrations:write'
+  | 'settings:read'
+  | 'settings:write';
+
 export interface User {
   id: number;
   name: string;
   email: string;
+  role?: UserRole;
+  permissions?: Permission[];
 }
 
 export interface AuthState {

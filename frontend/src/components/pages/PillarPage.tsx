@@ -40,13 +40,13 @@ export function PillarPage() {
 
   if (!pillar) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="text-center">
-          <h1 className="text-h2 text-primary-900 mb-4">Page not found</h1>
-          <p className="text-neutral-600 mb-4">
+          <h1 className="text-xl sm:text-2xl font-serif font-semibold text-primary-900 mb-4">Page not found</h1>
+          <p className="text-neutral-600 mb-4 text-sm sm:text-base">
             The page you're looking for doesn't exist or has been moved.
           </p>
-          <Link to="/" className="text-primary-700 hover:underline">
+          <Link to="/" className="text-primary-700 hover:underline text-sm sm:text-base">
             Return to home
           </Link>
         </div>
@@ -57,7 +57,7 @@ export function PillarPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-28 bg-primary-900">
+      <section className="relative py-12 sm:py-16 md:py-20 lg:py-28 bg-primary-900">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
@@ -68,9 +68,11 @@ export function PillarPage() {
         />
         <div className="container-main relative z-10">
           <div className="max-w-3xl">
-            <div className="divider-accent mb-6" />
-            <h1 className="text-display text-white mb-6">{pillar.name}</h1>
-            <p className="text-body-lg text-primary-100 leading-relaxed">
+            <div className="divider-accent mb-4 sm:mb-6" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-semibold text-white mb-4 sm:mb-6 leading-tight">
+              {pillar.name}
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-primary-100 leading-relaxed">
               {pillar.description || pillar.tagline}
             </p>
           </div>
@@ -81,14 +83,16 @@ export function PillarPage() {
       {oneOffServices.length > 0 && (
         <section className="section">
           <div className="container-main">
-            <div className="mb-10">
-              <h2 className="text-h2 text-primary-900 mb-3">One-off Services</h2>
-              <p className="text-neutral-600">
+            <div className="mb-6 sm:mb-8 md:mb-10">
+              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-h2 font-serif font-semibold text-primary-900 mb-2 sm:mb-3">
+                One-off Services
+              </h2>
+              <p className="text-sm sm:text-base text-neutral-600">
                 Focused engagements designed to address specific needs with clear deliverables.
               </p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
               {oneOffServices.map((service) => (
                 <ServiceCard
                   key={service.id}
@@ -106,14 +110,16 @@ export function PillarPage() {
       {subscriptionServices.length > 0 && (
         <section className="section bg-neutral-50">
           <div className="container-main">
-            <div className="mb-10">
-              <h2 className="text-h2 text-primary-900 mb-3">Ongoing Support</h2>
-              <p className="text-neutral-600">
+            <div className="mb-6 sm:mb-8 md:mb-10">
+              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-h2 font-serif font-semibold text-primary-900 mb-2 sm:mb-3">
+                Ongoing Support
+              </h2>
+              <p className="text-sm sm:text-base text-neutral-600">
                 Continuous partnerships that provide sustained value and adapt to your evolving needs.
               </p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
               {subscriptionServices.map((service) => (
                 <ServiceCard
                   key={service.id}
@@ -131,8 +137,8 @@ export function PillarPage() {
       {oneOffServices.length === 0 && subscriptionServices.length === 0 && (
         <section className="section">
           <div className="container-main">
-            <div className="text-center py-12">
-              <p className="text-neutral-600">
+            <div className="text-center py-8 sm:py-12">
+              <p className="text-neutral-600 text-sm sm:text-base">
                 No services are currently available for this category. Please check back later.
               </p>
             </div>
@@ -145,11 +151,11 @@ export function PillarPage() {
         <section className="section">
           <div className="container-main">
             <div className="max-w-3xl mx-auto">
-              <div className="text-center mb-10">
-                <h2 className="text-h2 text-primary-900 mb-3">
+              <div className="text-center mb-6 sm:mb-8 md:mb-10">
+                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-h2 font-serif font-semibold text-primary-900 mb-2 sm:mb-3">
                   Frequently Asked Questions
                 </h2>
-                <p className="text-neutral-600">
+                <p className="text-sm sm:text-base text-neutral-600 px-4 sm:px-0">
                   Find answers to common questions about our {pillar.name.toLowerCase()} services.
                 </p>
               </div>
@@ -169,11 +175,11 @@ export function PillarPage() {
       {/* CTA Section */}
       <section className="section bg-primary-50">
         <div className="container-main">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-h2 text-primary-900 mb-4">
+          <div className="max-w-3xl mx-auto text-center px-4 sm:px-0">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-h2 font-serif font-semibold text-primary-900 mb-3 sm:mb-4">
               Ready to discuss your needs?
             </h2>
-            <p className="text-body-lg text-neutral-600 mb-8">
+            <p className="text-sm sm:text-base md:text-lg text-neutral-600 mb-6 sm:mb-8">
               Get in touch to explore how our {pillar.name.toLowerCase()} services
               can support your objectives.
             </p>
@@ -181,10 +187,10 @@ export function PillarPage() {
               as={Link}
               to="/contact"
               size="lg"
-              className="bg-accent-yellow text-primary-900 hover:bg-yellow-400 border-accent-yellow"
+              className="w-full sm:w-auto bg-accent-yellow text-primary-900 hover:bg-yellow-400 border-accent-yellow"
             >
               Get in touch
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </div>
         </div>

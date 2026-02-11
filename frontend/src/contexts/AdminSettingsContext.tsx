@@ -16,7 +16,7 @@ interface AdminThemeConfig {
 interface AdminSettingsContextType {
   settings: AdminThemeConfig;
   isLoading: boolean;
-  refetch: () => void;
+  refetch: () => Promise<unknown>;
 }
 
 const defaultSettings: AdminThemeConfig = {

@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import type { ApiResponse } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -9,27 +9,16 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  withCredentials: true, // Enable sending cookies with requests
 });
-
-// Request interceptor
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      if (window.location.pathname.startsWith('/admin')) {
+      // Only redirect to login if on admin pages
+      if (window.location.pathname.startsWith('/admin') && !window.location.pathname.includes('/login')) {
         window.location.href = '/admin/login';
       }
     }

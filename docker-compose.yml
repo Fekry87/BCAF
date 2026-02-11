@@ -1,0 +1,134 @@
+version: '3.8'
+
+# =============================================================================
+# CONSULTANCY PLATFORM - DOCKER COMPOSE
+# =============================================================================
+# Usage:
+#   Development: docker compose up -d
+#   Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: consultancy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-consultancy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-consultancy_secret}
+      POSTGRES_DB: ${DB_NAME:-consultancy_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - consultancy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-consultancy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Backend API (Express.js)
+  # =============================================================================
+  api:
+    build:
+      context: ./mock-api
+      dockerfile: Dockerfile
+    container_name: consultancy-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 8000
+      DATABASE_URL: postgresql://${DB_USER:-consultancy}:${DB_PASSWORD:-consultancy_secret}@db:5432/${DB_NAME:-consultancy_db}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-secret-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@consultancy.com}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Consultancy Platform}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@consultancy.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - api_logs:/app/logs
+    networks:
+      - consultancy-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =============================================================================
+  # Frontend (React/Vite) - Using Nginx for production
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+    container_name: consultancy-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - consultancy-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # Redis Cache (Optional - for session storage in production)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: consultancy-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - consultancy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_logs:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  consultancy-network:
+    driver: bridge

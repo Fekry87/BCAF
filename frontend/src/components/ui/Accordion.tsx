@@ -52,17 +52,17 @@ export function AccordionItem({ id, title, children, defaultOpen = false, icon }
   );
 
   const triggerClasses = clsx(
-    'w-full flex items-center justify-between text-left font-medium transition-all duration-200',
+    'w-full flex items-center justify-between text-left text-sm sm:text-base font-medium transition-all duration-200',
     {
       // Default variant - modern list style
-      'py-5 px-4 text-primary-900 hover:text-primary-700 hover:bg-neutral-50 rounded-lg -mx-4': variant === 'default',
+      'py-4 sm:py-5 px-3 sm:px-4 text-primary-900 hover:text-primary-700 hover:bg-neutral-50 rounded-lg -mx-3 sm:-mx-4': variant === 'default',
       'text-primary-700': variant === 'default' && isOpen,
       // Card variant
-      'p-5 text-primary-900': variant === 'card',
+      'p-4 sm:p-5 text-primary-900': variant === 'card',
       'bg-primary-50': variant === 'card' && isOpen,
       'hover:bg-neutral-50': variant === 'card' && !isOpen,
       // Minimal variant
-      'py-3 text-neutral-800 hover:text-primary-700': variant === 'minimal',
+      'py-2 sm:py-3 text-neutral-800 hover:text-primary-700': variant === 'minimal',
     }
   );
 
@@ -72,11 +72,11 @@ export function AccordionItem({ id, title, children, defaultOpen = false, icon }
   );
 
   const contentInnerClasses = clsx(
-    'text-neutral-600 leading-relaxed',
+    'text-xs sm:text-sm md:text-base text-neutral-600 leading-relaxed',
     {
-      'pb-5 px-4': variant === 'default',
-      'px-5 pb-5': variant === 'card',
-      'pb-3': variant === 'minimal',
+      'pb-4 sm:pb-5 px-3 sm:px-4': variant === 'default',
+      'px-4 sm:px-5 pb-4 sm:pb-5': variant === 'card',
+      'pb-2 sm:pb-3': variant === 'minimal',
     }
   );
 
@@ -98,19 +98,19 @@ export function AccordionItem({ id, title, children, defaultOpen = false, icon }
 
         {variant === 'card' ? (
           <div className={clsx(
-            'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
+            'w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
             isOpen ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-500'
           )}>
             <ChevronDown className={clsx(
-              'h-5 w-5 transition-transform duration-300',
+              'h-4 w-4 sm:h-5 sm:w-5 transition-transform duration-300',
               isOpen && 'rotate-180'
             )} />
           </div>
         ) : (
           isOpen ? (
-            <Minus className="h-5 w-5 text-primary-600 flex-shrink-0" />
+            <Minus className="h-4 w-4 sm:h-5 sm:w-5 text-primary-600 flex-shrink-0" />
           ) : (
-            <Plus className="h-5 w-5 text-neutral-400 flex-shrink-0" />
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400 flex-shrink-0" />
           )
         )}
       </button>
@@ -142,7 +142,7 @@ export function Accordion({
   const containerClasses = clsx(
     className,
     {
-      'bg-white rounded-xl border border-neutral-200 shadow-sm px-4 divide-y divide-neutral-100': variant === 'default',
+      'bg-white rounded-lg sm:rounded-xl border border-neutral-200 shadow-sm px-3 sm:px-4 divide-y divide-neutral-100': variant === 'default',
     }
   );
 

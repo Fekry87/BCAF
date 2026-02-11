@@ -74,35 +74,35 @@ export function Footer() {
     'Expert guidance in business strategy and education support, combining academic rigour with practical expertise.';
 
   return (
-    <footer className="bg-primary-900 text-white">
-      <div className="container-main py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+    <footer role="contentinfo" aria-label="Site footer" className="bg-primary-900 text-white">
+      <div className="container-main py-10 sm:py-12 md:py-16 px-4 sm:px-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 md:gap-12">
           {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                <span className="text-primary-900 font-serif font-bold text-xl">C</span>
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-lg flex items-center justify-center">
+                <span className="text-primary-900 font-serif font-bold text-lg sm:text-xl">C</span>
               </div>
-              <span className="font-serif font-semibold text-xl">
+              <span className="font-serif font-semibold text-lg sm:text-xl">
                 {settings?.site_name || 'Consultancy'}
               </span>
             </div>
-            <p className="text-primary-200 leading-relaxed">
+            <p className="text-xs sm:text-sm text-primary-200 leading-relaxed">
               {brandDescription}
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-serif font-semibold text-lg mb-4 text-white">
+            <h4 className="font-serif font-semibold text-sm sm:text-base md:text-lg mb-3 sm:mb-4 text-white">
               Quick Links
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5 sm:space-y-2">
               {quickLinks.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className="text-primary-200 hover:text-white transition-colors"
+                    className="text-xs sm:text-sm text-primary-200 hover:text-white transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -113,31 +113,31 @@ export function Footer() {
 
           {/* Contact Info */}
           <div>
-            <h4 className="font-serif font-semibold text-lg mb-4 text-white">
+            <h4 className="font-serif font-semibold text-sm sm:text-base md:text-lg mb-3 sm:mb-4 text-white">
               Contact Us
             </h4>
-            <ul className="space-y-3">
-              <li className="flex items-start gap-3">
-                <Mail className="h-5 w-5 text-primary-400 flex-shrink-0 mt-0.5" />
+            <ul className="space-y-2 sm:space-y-3">
+              <li className="flex items-start gap-2 sm:gap-3">
+                <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-primary-400 flex-shrink-0 mt-0.5" />
                 <a
                   href={`mailto:${settings?.email || 'info@consultancy.com'}`}
-                  className="text-primary-200 hover:text-white transition-colors"
+                  className="text-xs sm:text-sm text-primary-200 hover:text-white transition-colors break-all"
                 >
                   {settings?.email || 'info@consultancy.com'}
                 </a>
               </li>
-              <li className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-primary-400 flex-shrink-0 mt-0.5" />
+              <li className="flex items-start gap-2 sm:gap-3">
+                <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-primary-400 flex-shrink-0 mt-0.5" />
                 <a
                   href={`tel:${settings?.phone || '+441234567890'}`}
-                  className="text-primary-200 hover:text-white transition-colors"
+                  className="text-xs sm:text-sm text-primary-200 hover:text-white transition-colors"
                 >
                   {settings?.phone || '+44 (0) 123 456 7890'}
                 </a>
               </li>
-              <li className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-primary-400 flex-shrink-0 mt-0.5" />
-                <span className="text-primary-200 whitespace-pre-line">
+              <li className="flex items-start gap-2 sm:gap-3">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-primary-400 flex-shrink-0 mt-0.5" />
+                <span className="text-xs sm:text-sm text-primary-200 whitespace-pre-line">
                   {settings?.address || '123 Academic Lane\nLondon, EC1A 1BB'}
                 </span>
               </li>
@@ -145,20 +145,20 @@ export function Footer() {
           </div>
 
           {/* Social & Legal */}
-          <div>
-            <h4 className="font-serif font-semibold text-lg mb-4 text-white">
+          <div className="col-span-2 md:col-span-1">
+            <h4 className="font-serif font-semibold text-sm sm:text-base md:text-lg mb-3 sm:mb-4 text-white">
               Connect
             </h4>
-            <div className="flex gap-4 mb-6">
+            <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
               {settings?.linkedin_url && (
                 <a
                   href={settings.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
+                  className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
                   aria-label="LinkedIn"
                 >
-                  <Linkedin className="h-5 w-5" />
+                  <Linkedin className="h-4 w-4 sm:h-5 sm:w-5" />
                 </a>
               )}
               {settings?.twitter_url && (
@@ -166,10 +166,10 @@ export function Footer() {
                   href={settings.twitter_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
+                  className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
                   aria-label="Twitter"
                 >
-                  <Twitter className="h-5 w-5" />
+                  <Twitter className="h-4 w-4 sm:h-5 sm:w-5" />
                 </a>
               )}
               {!settings?.linkedin_url && !settings?.twitter_url && (
@@ -178,29 +178,29 @@ export function Footer() {
                     href="https://linkedin.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-10 h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
                     aria-label="LinkedIn"
                   >
-                    <Linkedin className="h-5 w-5" />
+                    <Linkedin className="h-4 w-4 sm:h-5 sm:w-5" />
                   </a>
                   <a
                     href="https://twitter.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-10 h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-800 rounded-lg flex items-center justify-center hover:bg-primary-700 transition-colors"
                     aria-label="Twitter"
                   >
-                    <Twitter className="h-5 w-5" />
+                    <Twitter className="h-4 w-4 sm:h-5 sm:w-5" />
                   </a>
                 </>
               )}
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5 sm:space-y-2">
               {legalLinks.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className="text-sm text-primary-300 hover:text-white transition-colors"
+                    className="text-xs sm:text-sm text-primary-300 hover:text-white transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -213,8 +213,8 @@ export function Footer() {
 
       {/* Copyright Bar */}
       <div className="border-t border-primary-800">
-        <div className="container-main py-6">
-          <p className="text-center text-primary-300 text-sm">
+        <div className="container-main py-4 sm:py-6 px-4 sm:px-6">
+          <p className="text-center text-primary-300 text-xs sm:text-sm">
             &copy; {currentYear} {settings?.site_name || 'Consultancy Platform'}. All rights reserved.
           </p>
         </div>

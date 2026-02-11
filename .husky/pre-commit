@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# Run lint-staged to check and format staged files
+npx lint-staged

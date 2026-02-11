@@ -4,15 +4,22 @@
 
 /* Design Tokens as CSS Variables */
 :root {
-  /* Colors - Can be customized via Theme admin */
-  --color-primary-900: #0d2240;
-  --color-primary-800: #133a6b;
-  --color-primary-700: #1a4f8c;
-  --color-primary-600: #2563a8;
-  --color-primary-500: #3b82c4;
-  --color-primary-400: #60a5e0;
-  --color-primary-100: #e8f2fc;
-  --color-primary-50: #f4f9fe;
+  /* Background Colors - Can be customized via Theme admin */
+  --color-primary-900: #2c4a6e;  /* Dark backgrounds (hero, dark sections) */
+  --color-primary-800: #3a5a7c;  /* Secondary dark backgrounds */
+  --color-primary-700: #4a6a8c;  /* Headers, navigation */
+  --color-primary-600: #2563a8;  /* Backward compatibility */
+  --color-primary-500: #d1d5db;  /* Borders, dividers */
+  --color-primary-400: #9ca3af;  /* Backward compatibility */
+  --color-primary-100: #ffffff;  /* Cards, panels */
+  --color-primary-50: #f8fafc;   /* Page background */
+
+  /* Text Colors - Separate from backgrounds */
+  --color-text-heading: #1a1a2e;    /* Main headings */
+  --color-text-subheading: #2d2d44; /* Subheadings */
+  --color-text-body: #4a4a5a;       /* Body text */
+  --color-text-muted: #9ca3af;      /* Captions, placeholders */
+  --color-text-link-hover: #2563eb; /* Link hover */
 
   --color-neutral-900: #1a1a1a;
   --color-neutral-700: #404040;
@@ -28,7 +35,7 @@
 
   /* CTA Colors - Default to yellow */
   --color-cta-primary-bg: #f4c430;
-  --color-cta-primary-text: #0d2240;
+  --color-cta-primary-text: #1a1a2e;
   --color-cta-primary-hover: #e6b62d;
 
   --color-success: #059669;
@@ -80,21 +87,42 @@
 
 /* Base Styles */
 @layer base {
+  /* Prevent horizontal overflow */
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
-    @apply font-sans text-neutral-900 bg-white antialiased;
+    @apply font-sans antialiased;
+    color: var(--color-text-body);
+    background-color: var(--color-primary-50);
     font-feature-settings: 'kern' 1, 'liga' 1;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-serif text-primary-900;
+  h1 {
+    @apply font-serif;
+    color: var(--color-text-heading);
+  }
+
+  h2, h3, h4, h5, h6 {
+    @apply font-serif;
+    color: var(--color-text-subheading);
+  }
+
+  p {
+    color: var(--color-text-body);
   }
 
   a {
-    @apply text-primary-700 transition-colors hover:text-primary-600;
+    color: var(--color-text-body);
+    @apply transition-colors;
+  }
+
+  a:hover {
+    color: var(--color-text-link-hover);
   }
 
   /* Focus States for Accessibility */
@@ -111,14 +139,21 @@
   .skip-link:focus {
     @apply top-4;
   }
+
+  /* Ensure images don't overflow */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 /* Component Styles */
 @layer components {
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center px-6 py-3 font-medium rounded-md transition-all duration-200;
+    @apply inline-flex items-center justify-center px-4 py-2.5 sm:px-6 sm:py-3 font-medium rounded-md transition-all duration-200;
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2;
+    @apply text-sm sm:text-base;
   }
 
   .btn-primary {
@@ -145,10 +180,11 @@
 
   /* Form Inputs */
   .input {
-    @apply w-full h-12 px-4 border border-neutral-300 rounded-md;
+    @apply w-full h-11 sm:h-12 px-3 sm:px-4 border border-neutral-300 rounded-md;
     @apply transition-all duration-200;
     @apply focus:border-primary-600 focus:ring-1 focus:ring-primary-600;
     @apply placeholder:text-neutral-400;
+    @apply text-base; /* Prevents iOS zoom on focus */
   }
 
   .input-error {
@@ -163,18 +199,19 @@
     @apply text-sm text-red-600 mt-1;
   }
 
-  /* Cards */
+  /* Cards - Responsive padding */
   .card {
-    @apply bg-white border border-neutral-200 rounded-lg p-8;
+    @apply bg-white border border-neutral-200 rounded-lg p-5 sm:p-6 md:p-8;
     @apply transition-all duration-200;
     @apply hover:shadow-card hover:border-primary-400;
   }
 
   /* Accordion */
   .accordion-trigger {
-    @apply flex items-center justify-between w-full py-4 text-left;
+    @apply flex items-center justify-between w-full py-3 sm:py-4 text-left;
     @apply font-semibold text-neutral-900;
     @apply transition-colors hover:text-primary-700;
+    @apply text-sm sm:text-base;
   }
 
   .accordion-content {
@@ -186,35 +223,66 @@
     @apply bg-accent-yellow;
   }
 
-  /* Container */
+  /* Container - Better mobile padding */
   .container-main {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    width: 100%;
   }
 
-  /* Section Spacing */
+  /* Section Spacing - Reduced on mobile */
   .section {
-    @apply py-16 md:py-20 lg:py-24;
+    @apply py-10 sm:py-14 md:py-16 lg:py-20 xl:py-24;
   }
 
-  /* Hero */
+  /* Hero - Responsive heights */
   .hero {
-    @apply relative min-h-[600px] max-h-[850px] h-[85vh];
-    @apply flex items-center;
+    @apply relative flex items-center;
+    min-height: 450px;
+    height: 70vh;
+    max-height: 750px;
+  }
+
+  @media (min-width: 640px) {
+    .hero {
+      min-height: 500px;
+      height: 75vh;
+      max-height: 800px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hero {
+      min-height: 550px;
+      height: 80vh;
+      max-height: 850px;
+    }
   }
 
   .hero-overlay {
     @apply absolute inset-0;
     background: linear-gradient(
       to right,
-      rgba(13, 34, 64, 0.9) 0%,
-      rgba(13, 34, 64, 0.7) 50%,
-      transparent 100%
+      rgba(13, 34, 64, 0.95) 0%,
+      rgba(13, 34, 64, 0.85) 40%,
+      rgba(13, 34, 64, 0.6) 70%,
+      rgba(13, 34, 64, 0.4) 100%
     );
+  }
+
+  @media (min-width: 768px) {
+    .hero-overlay {
+      background: linear-gradient(
+        to right,
+        rgba(13, 34, 64, 0.9) 0%,
+        rgba(13, 34, 64, 0.7) 50%,
+        transparent 100%
+      );
+    }
   }
 
   /* Yellow accent divider */
   .divider-accent {
-    @apply h-1 w-16 bg-accent-yellow;
+    @apply h-1 w-12 sm:w-16 bg-accent-yellow;
   }
 }
 
@@ -224,12 +292,72 @@
     text-wrap: balance;
   }
 
-  /* Reduced motion preference */
+  /* Reduced motion preference - respects user's system settings */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    /* Disable smooth scrolling */
+    html {
+      scroll-behavior: auto !important;
+    }
+
+    /* Ensure accordions still work but without animation */
+    .accordion-content {
+      transition: none !important;
+    }
+
+    /* Disable hover scale effects */
+    .card:hover {
+      transform: none !important;
+    }
+
+    /* Disable spinner animations */
+    .animate-spin {
+      animation: none !important;
+    }
+
+    /* Static focus states instead of animated */
+    :focus-visible {
+      transition: none !important;
+    }
+  }
+
+  /* Motion-safe animations - only apply when user prefers motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-safe\:animate-fadeIn {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .motion-safe\:animate-slideUp {
+      animation: slideUp 0.3s ease-out;
+    }
+  }
+
+  /* Keyframes for animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 }

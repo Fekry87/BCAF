@@ -74,6 +74,7 @@ export function Header() {
       </a>
 
       <header
+        role="banner"
         className={clsx(
           'fixed top-0 left-0 right-0 z-40 transition-all duration-300',
           isScrolled
@@ -82,7 +83,7 @@ export function Header() {
         )}
       >
         <div className="container-main">
-          <nav className="flex items-center justify-between">
+          <nav aria-label="Main navigation" className="flex items-center justify-between">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
               {logoImage ? (

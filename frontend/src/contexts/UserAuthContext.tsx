@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface User {
   id: number;
@@ -37,8 +37,7 @@ interface SignUpData {
 
 const UserAuthContext = createContext<UserAuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = 'consultancy_user';
-const USER_TOKEN_KEY = 'consultancy_user_token';
+const USER_TOKEN_KEY = 'user_auth_token';
 
 export function UserAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -46,38 +45,35 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
 
-  // Load user from localStorage and verify with API on mount
+  // Load user on mount if token exists
   useEffect(() => {
     const loadUser = async () => {
-      const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-      const storedToken = localStorage.getItem(USER_TOKEN_KEY);
+      const token = localStorage.getItem(USER_TOKEN_KEY);
 
-      if (storedUser && storedToken) {
-        try {
-          // Verify token with API
-          const response = await fetch(`${API_BASE}/users/me`, {
-            headers: {
-              Authorization: `Bearer ${storedToken}`,
-            },
-          });
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data) {
-              setUser(data.data);
-            } else {
-              // Token invalid, clear storage
-              localStorage.removeItem(USER_STORAGE_KEY);
-              localStorage.removeItem(USER_TOKEN_KEY);
-            }
+      try {
+        const response = await fetch(`${API_BASE}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            setUser(data.data);
           } else {
-            // Token invalid, use stored user as fallback (for demo)
-            setUser(JSON.parse(storedUser));
+            localStorage.removeItem(USER_TOKEN_KEY);
           }
-        } catch {
-          // API unavailable, use stored user as fallback
-          setUser(JSON.parse(storedUser));
+        } else {
+          localStorage.removeItem(USER_TOKEN_KEY);
         }
+      } catch {
+        // Keep token, might be network issue
       }
       setIsLoading(false);
     };
@@ -99,9 +95,10 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success && data.data) {
         const { user: userData, token } = data.data;
+        if (token) {
+          localStorage.setItem(USER_TOKEN_KEY, token);
+        }
         setUser(userData);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
-        localStorage.setItem(USER_TOKEN_KEY, token);
         setIsAuthModalOpen(false);
         return { success: true };
       } else {
@@ -113,29 +110,43 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (data: SignUpData): Promise<{ success: boolean; error?: string }> => {
+  const signUp = async (signUpData: SignUpData): Promise<{ success: boolean; error?: string }> => {
     try {
+      const payload = {
+        name: `${signUpData.firstName} ${signUpData.lastName}`,
+        email: signUpData.email,
+        password: signUpData.password,
+        company: signUpData.company,
+        phone: signUpData.phone,
+      };
+
       const response = await fetch(`${API_BASE}/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();
 
       if (responseData.success && responseData.data) {
         const { user: userData, token } = responseData.data;
+        if (token) {
+          localStorage.setItem(USER_TOKEN_KEY, token);
+        }
         setUser(userData);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
-        localStorage.setItem(USER_TOKEN_KEY, token);
         setIsAuthModalOpen(false);
         return { success: true };
       } else {
-        // Check for specific validation errors
         if (responseData.errors?.email) {
           return { success: false, error: responseData.errors.email[0] };
+        }
+        if (responseData.errors?.name) {
+          return { success: false, error: responseData.errors.name[0] };
+        }
+        if (responseData.errors?.password) {
+          return { success: false, error: responseData.errors.password[0] };
         }
         return { success: false, error: responseData.message || 'Registration failed' };
       }
@@ -145,24 +156,9 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = async () => {
-    const token = localStorage.getItem(USER_TOKEN_KEY);
-    if (token) {
-      try {
-        await fetch(`${API_BASE}/users/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } catch {
-        // Ignore logout errors
-      }
-    }
-
-    setUser(null);
-    localStorage.removeItem(USER_STORAGE_KEY);
+  const signOut = () => {
     localStorage.removeItem(USER_TOKEN_KEY);
+    setUser(null);
   };
 
   const openSignIn = () => {

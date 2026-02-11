@@ -1,9 +1,24 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import {
+  apiLimiter,
+  authLimiter,
+  contactLimiter,
+  validateLogin,
+  validateContact,
+  validateRegister,
+  handleValidationErrors,
+  hashPassword,
+  verifyPassword,
+  securityHeaders,
+  sanitizeRequest,
+} from './middleware/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,12 +42,26 @@ const config = {
   webhookSecret: process.env.WEBHOOK_SECRET || '',
 };
 
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // We set custom CSP in securityHeaders
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(securityHeaders);
+app.use(sanitizeRequest);
+
 // CORS configuration
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: [config.frontendUrl, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
+
+// Apply general rate limiting to all API routes
+app.use('/api', apiLimiter);
 
 // ============================================
 // DATA STORE - Persisted to JSON file
@@ -324,19 +353,112 @@ function saveData() {
 let data = loadData();
 
 // ============================================
-// AUTH
+// AUTH & RBAC
 // ============================================
-const validTokens = new Set();
-const adminUser = { id: 1, name: 'Admin User', email: 'admin@consultancy.test' };
+const validTokens = new Map(); // token -> { userId, role }
+
+// Roles and permissions
+const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
+  EDITOR: 'editor',
+  VIEWER: 'viewer',
+};
+
+const PERMISSIONS = {
+  // Content management
+  'content:read': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR, ROLES.VIEWER],
+  'content:write': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR],
+  'content:delete': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+
+  // User management
+  'users:read': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  'users:write': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  'users:delete': [ROLES.SUPER_ADMIN],
+
+  // Orders
+  'orders:read': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EDITOR],
+  'orders:write': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  'orders:delete': [ROLES.SUPER_ADMIN],
+
+  // Integrations
+  'integrations:read': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  'integrations:write': [ROLES.SUPER_ADMIN],
+
+  // Settings
+  'settings:read': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
+  'settings:write': [ROLES.SUPER_ADMIN],
+};
+
+// Admin users with roles
+const adminUsers = {
+  'admin@consultancy.test': {
+    id: 1,
+    name: 'Admin User',
+    email: 'admin@consultancy.test',
+    role: ROLES.SUPER_ADMIN,
+    permissions: Object.keys(PERMISSIONS), // Super admin has all permissions
+  },
+};
+
+// For backward compatibility
+const adminUser = adminUsers['admin@consultancy.test'];
+
+// Check if role has permission
+const hasPermission = (role, permission) => {
+  const allowedRoles = PERMISSIONS[permission];
+  return allowedRoles && allowedRoles.includes(role);
+};
 
 // Helpers
 const success = (d, message = null, meta = null) => ({ success: true, data: d, message, errors: null, meta });
 const error = (message) => ({ success: false, data: null, message, errors: null, meta: null });
 
+// Auth middleware - checks if user is authenticated
 const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !validTokens.has(token)) return res.status(401).json(error('Unauthenticated'));
+  const token = getAuthToken(req);
+  if (!token || !validTokens.has(token)) {
+    return res.status(401).json(error('Unauthenticated'));
+  }
+
+  // Attach user info to request
+  const tokenData = validTokens.get(token);
+  req.user = {
+    id: tokenData.userId,
+    role: tokenData.role,
+  };
+
   next();
+};
+
+// Permission middleware factory - checks if user has required permission
+const requirePermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json(error('Unauthenticated'));
+    }
+
+    if (!hasPermission(req.user.role, permission)) {
+      return res.status(403).json(error(`Forbidden: You don't have permission to ${permission}`));
+    }
+
+    next();
+  };
+};
+
+// Role middleware factory - checks if user has required role
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json(error('Unauthenticated'));
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json(error('Forbidden: Insufficient role'));
+    }
+
+    next();
+  };
 };
 
 // Generate slug from title
@@ -817,6 +939,34 @@ app.put('/api/admin/content/pages/home', authMiddleware, (req, res) => {
   res.json(success(req.body, 'Home page updated'));
 });
 
+// Hero background image upload endpoint (mock - accepts any file and returns a fake URL)
+// Different images to cycle through for visual confirmation
+const heroImages = [
+  'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=80', // Office
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=2000&q=80', // Skyscraper
+  'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=2000&q=80', // Meeting
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=2000&q=80', // City
+  'https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=2000&q=80', // Building
+];
+let heroImageIndex = 0;
+
+app.post('/api/admin/content/pages/home/hero-image', authMiddleware, (req, res) => {
+  // In a real implementation, this would handle file upload
+  // For mock, we'll simulate a successful upload by cycling through different images
+  heroImageIndex = (heroImageIndex + 1) % heroImages.length;
+  const fakeImageUrl = heroImages[heroImageIndex];
+  data.homePage.hero.backgroundImage = fakeImageUrl;
+  saveData();
+  res.json(success({ url: fakeImageUrl }, 'Hero background image uploaded successfully'));
+});
+
+// Hero background image delete endpoint
+app.delete('/api/admin/content/pages/home/hero-image', authMiddleware, (req, res) => {
+  data.homePage.hero.backgroundImage = '';
+  saveData();
+  res.json(success(null, 'Hero background image removed successfully'));
+});
+
 app.get('/api/admin/content/pages/about', authMiddleware, (req, res) => {
   res.json(success({
     hero: {
@@ -1019,12 +1169,9 @@ app.put('/api/admin/content/pages/contact', authMiddleware, (req, res) => {
   res.json(success(req.body, 'Contact page updated'));
 });
 
-// Contact Form Submission
-app.post('/api/contact', (req, res) => {
+// Contact Form Submission (with rate limiting and validation)
+app.post('/api/contact', contactLimiter, validateContact, handleValidationErrors, (req, res) => {
   const { name, email, phone, pillar_id, message } = req.body;
-  if (!name || !email || !message) {
-    return res.status(422).json({ success: false, message: 'Validation failed', errors: { name: !name ? ['Required'] : null, email: !email ? ['Required'] : null, message: !message ? ['Required'] : null } });
-  }
 
   const newContact = {
     id: getNextId(data.contacts),
@@ -1043,52 +1190,229 @@ app.post('/api/contact', (req, res) => {
 });
 
 // ============================================
-// AUTH ROUTES
+// AUTH ROUTES (with rate limiting, validation, and HttpOnly cookies)
 // ============================================
-app.post('/api/auth/login', (req, res) => {
+
+// Cookie configuration
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: false, // Allow HTTP for development
+  sameSite: 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
+// Helper to get token from cookie or header (for backward compatibility)
+const getAuthToken = (req) => {
+  return req.cookies?.auth_token || req.headers.authorization?.replace('Bearer ', '');
+};
+
+app.post('/api/auth/login', authLimiter, validateLogin, handleValidationErrors, (req, res) => {
   const { email, password } = req.body;
-  if (email === 'admin@consultancy.test' && password === 'password') {
+
+  // Check if admin user exists
+  const user = adminUsers[email];
+  if (user && password === 'password') {
     const token = 'mock-token-' + Date.now();
-    validTokens.add(token);
-    return res.json(success({ user: adminUser, token }, 'Login successful'));
+
+    // Store token with role information
+    validTokens.set(token, {
+      userId: user.id,
+      role: user.role,
+      email: user.email,
+    });
+
+    // Set HttpOnly cookie
+    res.cookie('auth_token', token, COOKIE_OPTIONS);
+
+    // Return user with role and permissions
+    const userResponse = {
+      ...user,
+      permissions: Object.keys(PERMISSIONS).filter(p => hasPermission(user.role, p)),
+    };
+
+    return res.json(success({ user: userResponse, token }, 'Login successful'));
   }
+
   res.status(422).json({ success: false, message: 'Validation failed', errors: { email: ['The provided credentials are incorrect.'] } });
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = getAuthToken(req);
   if (token) validTokens.delete(token);
+
+  // Clear the cookie
+  res.clearCookie('auth_token', { path: '/' });
   res.json(success(null, 'Logged out successfully'));
 });
 
 app.get('/api/auth/user', (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !validTokens.has(token)) return res.status(401).json(error('Unauthenticated'));
-  res.json(success(adminUser));
+  const token = getAuthToken(req);
+  if (!token || !validTokens.has(token)) {
+    return res.status(401).json(error('Unauthenticated'));
+  }
+
+  const tokenData = validTokens.get(token);
+  const user = adminUsers[tokenData.email];
+
+  if (!user) {
+    return res.status(401).json(error('User not found'));
+  }
+
+  // Return user with role and permissions
+  const userResponse = {
+    ...user,
+    permissions: Object.keys(PERMISSIONS).filter(p => hasPermission(user.role, p)),
+  };
+
+  res.json(success(userResponse));
+});
+
+// Token refresh endpoint
+app.post('/api/auth/refresh', (req, res) => {
+  const oldToken = getAuthToken(req);
+  if (!oldToken || !validTokens.has(oldToken)) {
+    return res.status(401).json(error('Invalid or expired token'));
+  }
+
+  const oldTokenData = validTokens.get(oldToken);
+
+  // Invalidate old token
+  validTokens.delete(oldToken);
+
+  // Generate new token with same user data
+  const newToken = 'mock-token-' + Date.now();
+  validTokens.set(newToken, oldTokenData);
+
+  // Set new HttpOnly cookie
+  res.cookie('auth_token', newToken, COOKIE_OPTIONS);
+
+  res.json(success({ token: newToken }, 'Token refreshed successfully'));
 });
 
 // ============================================
 // USER REGISTRATION & AUTH (Customers)
 // ============================================
-const userTokens = new Map(); // token -> userId
+
+// Token configuration
+const TOKEN_CONFIG = {
+  accessTokenExpiry: 15 * 60 * 1000,      // 15 minutes
+  refreshTokenExpiry: 7 * 24 * 60 * 60 * 1000, // 7 days
+  tokenPrefix: 'user-token-',
+  refreshPrefix: 'refresh-token-',
+};
+
+// Initialize userTokens from persisted data with expiration support
+// Format: { token: { userId, expiresAt, type } }
+const userTokens = new Map();
+const refreshTokens = new Map();
+
+// Load persisted tokens
+if (data.userTokens) {
+  Object.entries(data.userTokens).forEach(([token, value]) => {
+    // Support both old format (just userId) and new format (object with expiry)
+    if (typeof value === 'object' && value.expiresAt) {
+      if (new Date(value.expiresAt) > new Date()) {
+        userTokens.set(token, value);
+      }
+    } else {
+      // Old format - migrate with 24h expiry
+      userTokens.set(token, {
+        userId: value,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        type: 'access',
+      });
+    }
+  });
+}
+
+if (data.refreshTokens) {
+  Object.entries(data.refreshTokens).forEach(([token, value]) => {
+    if (new Date(value.expiresAt) > new Date()) {
+      refreshTokens.set(token, value);
+    }
+  });
+}
+
+// Helper to generate tokens
+const generateAccessToken = (userId) => {
+  const token = TOKEN_CONFIG.tokenPrefix + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  const tokenData = {
+    userId,
+    expiresAt: new Date(Date.now() + TOKEN_CONFIG.accessTokenExpiry).toISOString(),
+    type: 'access',
+  };
+  userTokens.set(token, tokenData);
+  return { token, expiresAt: tokenData.expiresAt };
+};
+
+const generateRefreshToken = (userId) => {
+  const token = TOKEN_CONFIG.refreshPrefix + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  const tokenData = {
+    userId,
+    expiresAt: new Date(Date.now() + TOKEN_CONFIG.refreshTokenExpiry).toISOString(),
+    type: 'refresh',
+  };
+  refreshTokens.set(token, tokenData);
+  return { token, expiresAt: tokenData.expiresAt };
+};
+
+// Validate token and check expiration
+const validateUserToken = (token) => {
+  if (!token || !userTokens.has(token)) {
+    return null;
+  }
+  const tokenData = userTokens.get(token);
+
+  // Check expiration
+  if (new Date(tokenData.expiresAt) <= new Date()) {
+    userTokens.delete(token);
+    persistUserTokens();
+    return null;
+  }
+
+  return tokenData;
+};
+
+// Helper to persist userTokens
+const persistUserTokens = () => {
+  data.userTokens = Object.fromEntries(userTokens);
+  data.refreshTokens = Object.fromEntries(refreshTokens);
+  saveData();
+};
+
+// Cleanup expired tokens periodically (every 5 minutes)
+setInterval(() => {
+  const now = new Date();
+  let cleaned = false;
+
+  for (const [token, data] of userTokens) {
+    if (new Date(data.expiresAt) <= now) {
+      userTokens.delete(token);
+      cleaned = true;
+    }
+  }
+
+  for (const [token, data] of refreshTokens) {
+    if (new Date(data.expiresAt) <= now) {
+      refreshTokens.delete(token);
+      cleaned = true;
+    }
+  }
+
+  if (cleaned) {
+    persistUserTokens();
+  }
+}, 5 * 60 * 1000);
 
 // Register new user
-app.post('/api/users/register', async (req, res) => {
-  const { firstName, lastName, email, password, company, phone } = req.body;
+app.post('/api/users/register', authLimiter, validateRegister, handleValidationErrors, async (req, res) => {
+  const { name, email, password, company, phone } = req.body;
 
-  // Validation
-  if (!firstName || !lastName || !email || !password) {
-    return res.status(422).json({
-      success: false,
-      message: 'Validation failed',
-      errors: {
-        firstName: !firstName ? ['First name is required'] : null,
-        lastName: !lastName ? ['Last name is required'] : null,
-        email: !email ? ['Email is required'] : null,
-        password: !password ? ['Password is required'] : null,
-      },
-    });
-  }
+  // Parse name into firstName and lastName
+  const nameParts = name.trim().split(' ');
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ') || '';
 
   // Check if email already exists
   if (!data.users) data.users = [];
@@ -1101,13 +1425,16 @@ app.post('/api/users/register', async (req, res) => {
     });
   }
 
+  // Hash password before storing
+  const hashedPassword = await hashPassword(password);
+
   // Create new user
   const newUser = {
     id: getNextId(data.users),
     firstName,
     lastName,
     email: email.toLowerCase(),
-    password, // In production, this should be hashed
+    password: hashedPassword, // Now properly hashed
     company: company || null,
     phone: phone || null,
     status: 'active',
@@ -1150,13 +1477,26 @@ app.post('/api/users/register', async (req, res) => {
 
   saveData();
 
-  // Generate token
-  const token = 'user-token-' + Date.now();
-  userTokens.set(token, newUser.id);
+  // Generate tokens with expiration
+  const accessToken = generateAccessToken(newUser.id);
+  const refreshToken = generateRefreshToken(newUser.id);
+  persistUserTokens();
+
+  // Set HttpOnly cookies
+  res.cookie('user_auth_token', accessToken.token, USER_COOKIE_OPTIONS);
+  res.cookie('user_refresh_token', refreshToken.token, {
+    ...USER_COOKIE_OPTIONS,
+    maxAge: TOKEN_CONFIG.refreshTokenExpiry,
+  });
 
   // Return user without password
   const { password: _, ...userWithoutPassword } = newUser;
-  res.status(201).json(success({ user: userWithoutPassword, token }, 'Registration successful'));
+  res.status(201).json(success({
+    user: userWithoutPassword,
+    token: accessToken.token,
+    expiresAt: accessToken.expiresAt,
+    refreshToken: refreshToken.token,
+  }, 'Registration successful'));
 });
 
 // Simple helper for auto-sync (doesn't throw)
@@ -1210,24 +1550,55 @@ async function syncContactToSuiteDashSimple(config, contact) {
         contact_id: contactData.uid || contactData.id || contactData.contact_id,
         company_id: companyId,
       };
+    } else if (response.status === 429) {
+      // Rate limit exceeded - throw specific error
+      const errorText = await response.text();
+      console.error('[SuiteDash] API rate limit exceeded (429):', errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(errorData.message || 'SuiteDash API rate limit exceeded');
+      } catch (e) {
+        if (e.message.includes('rate limit') || e.message.includes('requests')) {
+          throw e;
+        }
+        throw new Error('SuiteDash API rate limit exceeded (80 requests/month). Please upgrade your plan.');
+      }
     } else {
       const errorText = await response.text();
       console.error('[SuiteDash] Contact sync failed:', errorText);
     }
   } catch (error) {
     console.error('[SuiteDash] API error:', error.message);
+    // Re-throw rate limit errors so they can be displayed to user
+    if (error.message.includes('rate limit') || error.message.includes('requests')) {
+      throw error;
+    }
   }
 
   // Return null on failure in production mode
   return null;
 }
 
-// User login
-app.post('/api/users/login', (req, res) => {
+// Cookie configuration for user auth
+const USER_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: false, // Allow HTTP for development
+  sameSite: 'lax',
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  path: '/',
+};
+
+// Helper to get user token from cookie or header
+const getUserAuthToken = (req) => {
+  return req.cookies?.user_auth_token || req.headers.authorization?.replace('Bearer ', '');
+};
+
+// User login (with rate limiting and validation)
+app.post('/api/users/login', authLimiter, validateLogin, handleValidationErrors, async (req, res) => {
   const { email, password } = req.body;
 
   if (!data.users) data.users = [];
-  const user = data.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+  const user = data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
   if (!user) {
     return res.status(422).json({
@@ -1237,23 +1608,47 @@ app.post('/api/users/login', (req, res) => {
     });
   }
 
-  // Generate token
-  const token = 'user-token-' + Date.now();
-  userTokens.set(token, user.id);
+  // Verify password against hash
+  const passwordValid = await verifyPassword(password, user.password);
+  if (!passwordValid) {
+    return res.status(422).json({
+      success: false,
+      message: 'Validation failed',
+      errors: { email: ['Invalid email or password'] },
+    });
+  }
+
+  // Generate tokens with expiration
+  const accessToken = generateAccessToken(user.id);
+  const refreshToken = generateRefreshToken(user.id);
+  persistUserTokens();
+
+  // Set HttpOnly cookies
+  res.cookie('user_auth_token', accessToken.token, USER_COOKIE_OPTIONS);
+  res.cookie('user_refresh_token', refreshToken.token, {
+    ...USER_COOKIE_OPTIONS,
+    maxAge: TOKEN_CONFIG.refreshTokenExpiry,
+  });
 
   const { password: _, ...userWithoutPassword } = user;
-  res.json(success({ user: userWithoutPassword, token }, 'Login successful'));
+  res.json(success({
+    user: userWithoutPassword,
+    token: accessToken.token,
+    expiresAt: accessToken.expiresAt,
+    refreshToken: refreshToken.token,
+  }, 'Login successful'));
 });
 
 // Get current user
 app.get('/api/users/me', (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || !userTokens.has(token)) {
-    return res.status(401).json(error('Unauthenticated'));
+  const token = getUserAuthToken(req);
+  const tokenData = validateUserToken(token);
+
+  if (!tokenData) {
+    return res.status(401).json(error('Unauthenticated or token expired'));
   }
 
-  const userId = userTokens.get(token);
-  const user = data.users.find(u => u.id === userId);
+  const user = data.users.find(u => u.id === tokenData.userId);
   if (!user) {
     return res.status(401).json(error('User not found'));
   }
@@ -1264,9 +1659,69 @@ app.get('/api/users/me', (req, res) => {
 
 // User logout
 app.post('/api/users/logout', (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) userTokens.delete(token);
+  const token = getUserAuthToken(req);
+  if (token) {
+    userTokens.delete(token);
+    persistUserTokens();
+  }
+
+  // Clear the cookie
+  res.clearCookie('user_auth_token', { path: '/' });
   res.json(success(null, 'Logged out successfully'));
+});
+
+// User token refresh endpoint
+app.post('/api/users/refresh', (req, res) => {
+  // Get refresh token from body, cookie, or header
+  const refreshToken = req.body.refreshToken ||
+    req.cookies?.user_refresh_token ||
+    req.headers['x-refresh-token'];
+
+  if (!refreshToken || !refreshTokens.has(refreshToken)) {
+    return res.status(401).json(error('Invalid or expired refresh token'));
+  }
+
+  const refreshTokenData = refreshTokens.get(refreshToken);
+
+  // Check refresh token expiration
+  if (new Date(refreshTokenData.expiresAt) <= new Date()) {
+    refreshTokens.delete(refreshToken);
+    persistUserTokens();
+    return res.status(401).json(error('Refresh token expired. Please login again.'));
+  }
+
+  const userId = refreshTokenData.userId;
+
+  // Verify user still exists
+  const user = data.users.find(u => u.id === userId);
+  if (!user) {
+    refreshTokens.delete(refreshToken);
+    persistUserTokens();
+    return res.status(401).json(error('User not found'));
+  }
+
+  // Invalidate old refresh token (rotation)
+  refreshTokens.delete(refreshToken);
+
+  // Generate new tokens
+  const newAccessToken = generateAccessToken(userId);
+  const newRefreshToken = generateRefreshToken(userId);
+  persistUserTokens();
+
+  // Set new HttpOnly cookies
+  res.cookie('user_auth_token', newAccessToken.token, USER_COOKIE_OPTIONS);
+  res.cookie('user_refresh_token', newRefreshToken.token, {
+    ...USER_COOKIE_OPTIONS,
+    maxAge: TOKEN_CONFIG.refreshTokenExpiry,
+  });
+
+  const { password: _, ...userWithoutPassword } = user;
+  res.json(success({
+    token: newAccessToken.token,
+    expiresAt: newAccessToken.expiresAt,
+    refreshToken: newRefreshToken.token,
+    user: userWithoutPassword,
+  }, 'Token refreshed successfully'));
 });
 
 // ============================================
@@ -1453,6 +1908,18 @@ async function createSuiteDashInvoice(suitedashConfig, customer, items, total, o
         console.log(`[SuiteDash] Contact created with ID: ${contactId}, Company ID: ${companyId}`);
       } catch (e) {
         console.log(`[SuiteDash] Failed to parse contact response:`, e.message);
+      }
+    } else if (contactResponse.status === 429) {
+      // Rate limit exceeded
+      console.log(`[SuiteDash] API rate limit exceeded (429)`);
+      try {
+        const errorData = JSON.parse(contactResponseText);
+        throw new Error(errorData.message || 'SuiteDash API rate limit exceeded. Please try again later or upgrade your plan.');
+      } catch (e) {
+        if (e.message.includes('rate limit') || e.message.includes('requests')) {
+          throw e;
+        }
+        throw new Error('SuiteDash API rate limit exceeded (80 requests/month). Please upgrade your plan or wait until next month.');
       }
     } else if (contactResponse.status === 422) {
       // Contact already exists - try to find it by email
@@ -2335,7 +2802,13 @@ app.get('/api/admin/contact-submissions', authMiddleware, (req, res) => {
 
   const contactsWithPillar = filtered.map(c => {
     const pillar = c.pillarId ? data.pillars.find(p => p.id === c.pillarId) : null;
-    return { ...c, pillar, status_label: c.status.charAt(0).toUpperCase() + c.status.slice(1).replace('_', ' ') };
+    return {
+      ...c,
+      pillar,
+      status_label: c.status.charAt(0).toUpperCase() + c.status.slice(1).replace('_', ' '),
+      created_at: c.createdAt,
+      updated_at: c.updatedAt || c.createdAt,
+    };
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   res.json(success(contactsWithPillar, null, { pagination: { current_page: 1, last_page: 1, per_page: 20, total: contactsWithPillar.length } }));
@@ -2370,6 +2843,20 @@ app.delete('/api/admin/contact-submissions/:id', authMiddleware, (req, res) => {
   data.contacts = data.contacts.filter(c => c.id !== parseInt(req.params.id));
   saveData();
   res.json(success(null, 'Contact deleted'));
+});
+
+// Bulk delete contacts
+app.post('/api/admin/contact-submissions/bulk-delete', authMiddleware, (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids)) {
+    return res.status(422).json(error('Invalid ids provided'));
+  }
+  const idsSet = new Set(ids);
+  const initialCount = data.contacts.length;
+  data.contacts = data.contacts.filter(c => !idsSet.has(c.id));
+  const deletedCount = initialCount - data.contacts.length;
+  saveData();
+  res.json(success({ deleted: deletedCount }, `${deletedCount} contact(s) deleted`));
 });
 
 // ============================================
@@ -2594,6 +3081,21 @@ app.delete('/api/admin/users/:id', authMiddleware, (req, res) => {
   data.users = data.users.filter(u => u.id !== parseInt(req.params.id));
   saveData();
   res.json(success(null, 'User deleted'));
+});
+
+// Bulk delete users
+app.post('/api/admin/users/bulk-delete', authMiddleware, (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids)) {
+    return res.status(422).json(error('Invalid ids provided'));
+  }
+  if (!data.users) data.users = [];
+  const idsSet = new Set(ids);
+  const initialCount = data.users.length;
+  data.users = data.users.filter(u => !idsSet.has(u.id));
+  const deletedCount = initialCount - data.users.length;
+  saveData();
+  res.json(success({ deleted: deletedCount }, `${deletedCount} user(s) deleted`));
 });
 
 // ============================================
@@ -2893,14 +3395,53 @@ app.post('/api/admin/integrations/suitedash/test', authMiddleware, async (req, r
     });
 
     if (response.ok) {
+      // Also check if Invoice API is available
+      const invoiceTestUrl = `${api_base_url || 'https://app.suitedash.com/secure-api'}/invoice/meta`;
+      let invoiceApiAvailable = false;
+      try {
+        const invoiceResponse = await fetch(invoiceTestUrl, {
+          method: 'GET',
+          headers: {
+            'X-Public-ID': public_id,
+            'X-Secret-Key': secret_key,
+            'Content-Type': 'application/json',
+          },
+        });
+        invoiceApiAvailable = invoiceResponse.ok || invoiceResponse.status === 200;
+      } catch (e) {
+        // Invoice API not available
+        invoiceApiAvailable = false;
+      }
+
       // Update connection status
       data.suitedash = {
         ...(data.suitedash || defaultSuiteDashConfig),
         connection_status: 'connected',
-        connection_message: 'Successfully connected to SuiteDash API'
+        connection_message: 'Successfully connected to SuiteDash API',
+        invoice_api_available: invoiceApiAvailable
       };
       saveData();
-      res.json(success({ success: true, message: 'Connection successful! SuiteDash API is accessible.' }));
+
+      const message = invoiceApiAvailable
+        ? 'Connection successful! Contact and Invoice APIs are accessible.'
+        : 'Connection successful! Contact API is accessible. Invoice API is not available - invoices must be created manually in SuiteDash.';
+      res.json(success({ success: true, message, invoice_api_available: invoiceApiAvailable }));
+    } else if (response.status === 429) {
+      // Rate limit exceeded
+      const errorText = await response.text();
+      let rateLimitMessage = 'SuiteDash API rate limit exceeded (80 requests/month).';
+      try {
+        const errorData = JSON.parse(errorText);
+        rateLimitMessage = errorData.message || rateLimitMessage;
+      } catch (e) {}
+
+      data.suitedash = {
+        ...(data.suitedash || defaultSuiteDashConfig),
+        connection_status: 'error',
+        connection_message: rateLimitMessage
+      };
+      saveData();
+      res.json(success({ success: false, message: rateLimitMessage, rate_limit_exceeded: true }));
     } else {
       const errorText = await response.text();
       data.suitedash = {
@@ -3481,6 +4022,81 @@ app.put('/api/admin/system-settings', authMiddleware, (req, res) => {
   data.systemSettings = { ...defaultSystemSettings, ...(data.systemSettings || {}), ...req.body };
   saveData();
   res.json(success(data.systemSettings, 'System settings updated'));
+});
+
+// ============================================
+// HEALTH CHECK ENDPOINT
+// ============================================
+app.get('/health', (req, res) => {
+  const healthcheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.nodeEnv,
+    version: process.env.npm_package_version || '1.0.0',
+    checks: {
+      database: 'ok', // Mock API uses file-based storage
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+      },
+    },
+  };
+  res.json(healthcheck);
+});
+
+// Kubernetes-style readiness probe
+app.get('/ready', (req, res) => {
+  // Check if data file is accessible
+  try {
+    fs.accessSync(DATA_FILE, fs.constants.R_OK | fs.constants.W_OK);
+    res.json({ status: 'ready' });
+  } catch {
+    res.status(503).json({ status: 'not ready', reason: 'Data file not accessible' });
+  }
+});
+
+// Kubernetes-style liveness probe
+app.get('/live', (req, res) => {
+  res.json({ status: 'alive' });
+});
+
+// Health endpoint for monitoring
+app.get('/api/health', (req, res) => {
+  const startTime = Date.now();
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.nodeEnv,
+    version: process.env.npm_package_version || '1.0.0',
+    checks: {
+      dataStore: 'ok',
+      memory: 'ok',
+    },
+  };
+
+  // Check data file
+  try {
+    fs.accessSync(DATA_FILE, fs.constants.R_OK | fs.constants.W_OK);
+    health.checks.dataStore = 'ok';
+  } catch {
+    health.checks.dataStore = 'error';
+    health.status = 'degraded';
+  }
+
+  // Check memory usage
+  const memUsage = process.memoryUsage();
+  const memUsedMB = memUsage.heapUsed / 1024 / 1024;
+  if (memUsedMB > 500) {
+    health.checks.memory = 'warning';
+    health.status = health.status === 'healthy' ? 'degraded' : health.status;
+  }
+
+  health.responseTime = Date.now() - startTime;
+
+  const statusCode = health.status === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // ============================================

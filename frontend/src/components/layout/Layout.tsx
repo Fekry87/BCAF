@@ -5,6 +5,7 @@ import { useWebsiteSettings } from '@/contexts/WebsiteSettingsContext';
 import { MaintenancePage } from '@/components/pages/MaintenancePage';
 import { NotFoundPage } from '@/components/pages/NotFoundPage';
 import { Loader2 } from 'lucide-react';
+import { SkipLink } from './SkipLink';
 
 // Map routes to page visibility keys
 const routeToPageKey: Record<string, 'home' | 'about' | 'contact' | 'checkout'> = {
@@ -22,9 +23,10 @@ export function Layout() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
+        <SkipLink />
         <Header />
-        <main id="main-content" className="flex-1 pt-16 lg:pt-20 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <main id="main-content" role="main" aria-label="Main content" className="flex-1 pt-16 lg:pt-20 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600" aria-label="Loading" />
         </main>
         <Footer />
       </div>
@@ -41,8 +43,9 @@ export function Layout() {
   if (pageKey && !isPageVisible(pageKey)) {
     return (
       <div className="min-h-screen flex flex-col">
+        <SkipLink />
         <Header />
-        <main id="main-content" className="flex-1 pt-16 lg:pt-20">
+        <main id="main-content" role="main" aria-label="Main content" className="flex-1 pt-16 lg:pt-20">
           <NotFoundPage />
         </main>
         <Footer />
@@ -52,8 +55,9 @@ export function Layout() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SkipLink />
       <Header />
-      <main id="main-content" className="flex-1 pt-16 lg:pt-20">
+      <main id="main-content" role="main" aria-label="Main content" className="flex-1 pt-16 lg:pt-20">
         <Outlet />
       </main>
       <Footer />

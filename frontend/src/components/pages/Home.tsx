@@ -103,19 +103,20 @@ export function HomePage() {
 
         <div className="container-main relative z-10">
           <div className="max-w-2xl">
-            <div className="divider-accent mb-6" />
-            <h1 className="text-display text-white mb-6">
+            <div className="divider-accent mb-4 sm:mb-6" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-semibold text-white mb-4 sm:mb-6 leading-tight">
               {hero.title}
             </h1>
-            <p className="text-body-lg text-primary-100 mb-8 leading-relaxed">
+            <p className="text-sm sm:text-base md:text-lg text-primary-100 mb-5 sm:mb-8 leading-relaxed">
               {hero.subtitle}
             </p>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button
                 as={Link}
                 to={hero.cta_link}
                 size="lg"
                 variant="primary"
+                className="w-full sm:w-auto justify-center"
               >
                 {hero.cta_text}
               </Button>
@@ -124,7 +125,7 @@ export function HomePage() {
                 to={hero.secondary_cta_link}
                 variant="secondary"
                 size="lg"
-                className="bg-white/10 border-white text-white hover:bg-white/20"
+                className="w-full sm:w-auto justify-center bg-white/10 border-white text-white hover:bg-white/20"
               >
                 {hero.secondary_cta_text}
               </Button>
@@ -136,29 +137,31 @@ export function HomePage() {
       {/* Pillars Section */}
       <section className="section bg-neutral-50">
         <div className="container-main">
-          <div className="text-center mb-12">
-            <div className="divider-accent mx-auto mb-6" />
-            <h2 className="text-h1 text-primary-900 mb-4">{pillarsSection.title}</h2>
-            <p className="text-body-lg text-neutral-600 max-w-2xl mx-auto">
+          <div className="text-center mb-8 sm:mb-12">
+            <div className="divider-accent mx-auto mb-4 sm:mb-6" />
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-h1 font-serif font-semibold text-primary-900 mb-3 sm:mb-4">
+              {pillarsSection.title}
+            </h2>
+            <p className="text-sm sm:text-base md:text-lg text-neutral-600 max-w-2xl mx-auto px-4 sm:px-0">
               {pillarsSection.subtitle}
             </p>
           </div>
 
           {pillarsLoading ? (
-            <div className="flex justify-center py-12">
+            <div className="flex justify-center py-8 sm:py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
             </div>
           ) : pillars.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-8 sm:py-12">
               <p className="text-neutral-600">No services available yet.</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
               {pillars.filter(p => p.is_active).map((pillar) => (
                 <Link
                   key={pillar.id}
                   to={`/${pillar.slug}`}
-                  className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 min-h-[400px] flex"
+                  className="group relative overflow-hidden rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 min-h-[280px] sm:min-h-[350px] md:min-h-[400px] flex"
                 >
                   {/* Background Image */}
                   <div
@@ -172,18 +175,18 @@ export function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-primary-900 via-primary-900/70 to-transparent" />
 
                   {/* Content */}
-                  <div className="relative z-10 flex flex-col justify-end p-8 w-full">
-                    <h3 className="text-h1 text-white mb-3">
+                  <div className="relative z-10 flex flex-col justify-end p-5 sm:p-6 md:p-8 w-full">
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-white mb-2 sm:mb-3">
                       {pillar.name}
                     </h3>
 
-                    <p className="text-lg text-primary-100 mb-6">
+                    <p className="text-sm sm:text-base md:text-lg text-primary-100 mb-4 sm:mb-6 line-clamp-2">
                       {pillar.tagline}
                     </p>
 
-                    <div className="flex items-center text-accent-yellow font-semibold group-hover:text-yellow-300 transition-colors">
+                    <div className="flex items-center text-accent-yellow font-semibold group-hover:text-yellow-300 transition-colors text-sm sm:text-base">
                       Explore services
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
+                      <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-2 transition-transform" />
                     </div>
                   </div>
                 </Link>
@@ -199,19 +202,21 @@ export function HomePage() {
           <div className="container-main">
             <div className="max-w-4xl mx-auto">
               {/* Section Header */}
-              <div className="text-center mb-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 mb-6">
-                  <HelpCircle className="h-8 w-8 text-primary-600" />
+              <div className="text-center mb-8 sm:mb-12">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary-100 mb-4 sm:mb-6">
+                  <HelpCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary-600" />
                 </div>
-                <h2 className="text-h1 text-primary-900 mb-4">{faqSection.title}</h2>
-                <p className="text-body-lg text-neutral-600 max-w-2xl mx-auto">
+                <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-h1 font-serif font-semibold text-primary-900 mb-3 sm:mb-4">
+                  {faqSection.title}
+                </h2>
+                <p className="text-sm sm:text-base md:text-lg text-neutral-600 max-w-2xl mx-auto px-4 sm:px-0">
                   {faqSection.subtitle}
                 </p>
               </div>
 
               {/* FAQ Accordion */}
               {faqsLoading ? (
-                <div className="flex justify-center py-12">
+                <div className="flex justify-center py-8 sm:py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
                 </div>
               ) : (
@@ -220,13 +225,13 @@ export function HomePage() {
 
               {/* View All Link */}
               {faqs.length > faqSection.limit && (
-                <div className="text-center mt-8">
+                <div className="text-center mt-6 sm:mt-8">
                   <Link
                     to="/contact#faq"
-                    className="inline-flex items-center text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+                    className="inline-flex items-center text-primary-600 font-semibold hover:text-primary-700 transition-colors text-sm sm:text-base"
                   >
                     View all FAQs
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                   </Link>
                 </div>
               )}
@@ -237,9 +242,11 @@ export function HomePage() {
 
       {/* CTA Section */}
       <section className="section bg-primary-700">
-        <div className="container-main text-center">
-          <h2 className="text-h1 text-white mb-4">{ctaSection.title}</h2>
-          <p className="text-body-lg text-primary-100 max-w-2xl mx-auto mb-8">
+        <div className="container-main text-center px-4">
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-h1 font-serif font-semibold text-white mb-3 sm:mb-4">
+            {ctaSection.title}
+          </h2>
+          <p className="text-sm sm:text-base md:text-lg text-primary-100 max-w-2xl mx-auto mb-6 sm:mb-8">
             {ctaSection.subtitle}
           </p>
           <Button
@@ -247,6 +254,7 @@ export function HomePage() {
             to={ctaSection.button_link}
             size="lg"
             variant="primary"
+            className="w-full sm:w-auto"
           >
             {ctaSection.button_text}
           </Button>

@@ -17,6 +17,13 @@ export default {
           800: 'var(--color-primary-800)',
           900: 'var(--color-primary-900)',
         },
+        text: {
+          heading: 'var(--color-text-heading)',
+          subheading: 'var(--color-text-subheading)',
+          body: 'var(--color-text-body)',
+          muted: 'var(--color-text-muted)',
+          'link-hover': 'var(--color-text-link-hover)',
+        },
         accent: {
           yellow: 'var(--color-accent-yellow)',
           'yellow-light': 'var(--color-accent-yellow-light)',

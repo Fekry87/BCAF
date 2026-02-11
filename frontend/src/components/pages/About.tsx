@@ -142,18 +142,20 @@ export function AboutPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-28 bg-primary-900">
+      <section className="relative py-12 sm:py-16 md:py-20 lg:py-28 bg-primary-900">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
             backgroundImage: `url("${content.hero.background_image}")`,
           }}
         />
-        <div className="container-main relative z-10">
+        <div className="container-main relative z-10 px-4 sm:px-6">
           <div className="max-w-3xl">
-            <div className="divider-accent mb-6" />
-            <h1 className="text-display text-white mb-6">{content.hero.title}</h1>
-            <p className="text-body-lg text-primary-100 leading-relaxed">
+            <div className="divider-accent mb-4 sm:mb-6" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-semibold text-white mb-4 sm:mb-6 leading-tight">
+              {content.hero.title}
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-primary-100 leading-relaxed">
               {content.hero.subtitle}
             </p>
           </div>
@@ -162,14 +164,16 @@ export function AboutPage() {
 
       {/* Mission Section */}
       <section className="section">
-        <div className="container-main">
+        <div className="container-main px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-h2 text-primary-900 mb-6">{content.mission.title}</h2>
-            <p className="text-body-lg text-neutral-600 leading-relaxed mb-4">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6">
+              {content.mission.title}
+            </h2>
+            <p className="text-sm sm:text-base md:text-lg text-neutral-600 leading-relaxed mb-3 sm:mb-4">
               {content.mission.content}
             </p>
             {content.mission.additional_content && (
-              <p className="text-neutral-600 leading-relaxed">
+              <p className="text-xs sm:text-sm md:text-base text-neutral-600 leading-relaxed">
                 {content.mission.additional_content}
               </p>
             )}
@@ -179,30 +183,32 @@ export function AboutPage() {
 
       {/* Values Section */}
       <section className="section bg-neutral-50">
-        <div className="container-main">
-          <div className="text-center mb-12">
-            <div className="divider-accent mx-auto mb-6" />
-            <h2 className="text-h2 text-primary-900 mb-4">{content.values.title}</h2>
-            <p className="text-neutral-600 max-w-2xl mx-auto">
+        <div className="container-main px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-10 md:mb-12">
+            <div className="divider-accent mx-auto mb-4 sm:mb-6" />
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">
+              {content.values.title}
+            </h2>
+            <p className="text-xs sm:text-sm md:text-base text-neutral-600 max-w-2xl mx-auto">
               {content.values.subtitle}
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {content.values.items.map((value) => (
               <div key={value.title} className="text-center">
-                <div className="mx-auto mb-4 flex justify-center">
+                <div className="mx-auto mb-3 sm:mb-4 flex justify-center">
                   <IconOrImage
                     icon={value.icon}
                     imageUrl={value.icon_image}
                     size="lg"
                     alt={value.title}
                     bgColor="bg-primary-100"
-                    className="rounded-xl"
+                    className="rounded-lg sm:rounded-xl w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16"
                   />
                 </div>
-                <h3 className="text-h4 text-primary-900 mb-3">{value.title}</h3>
-                <p className="text-neutral-600 text-sm">{value.description}</p>
+                <h3 className="text-sm sm:text-base md:text-lg font-serif font-semibold text-primary-900 mb-2 sm:mb-3">{value.title}</h3>
+                <p className="text-xs sm:text-sm text-neutral-600">{value.description}</p>
               </div>
             ))}
           </div>
@@ -211,28 +217,32 @@ export function AboutPage() {
 
       {/* Approach Section */}
       <section className="section">
-        <div className="container-main">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="container-main px-4 sm:px-6">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-10 lg:gap-12 items-center">
             <div>
-              <div className="divider-accent mb-6" />
-              <h2 className="text-h2 text-primary-900 mb-6">{content.approach.title}</h2>
-              <div className="space-y-4 text-neutral-600">
+              <div className="divider-accent mb-4 sm:mb-6" />
+              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6">
+                {content.approach.title}
+              </h2>
+              <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm md:text-base text-neutral-600">
                 {content.approach.paragraphs.map((paragraph, index) => (
                   <p key={index}>{paragraph}</p>
                 ))}
               </div>
             </div>
-            <div className="bg-primary-50 rounded-2xl p-8 lg:p-12">
-              <h3 className="text-h3 text-primary-900 mb-6">{content.approach.process_title}</h3>
-              <ol className="space-y-6">
+            <div className="bg-primary-50 rounded-xl sm:rounded-2xl p-5 sm:p-8 lg:p-12">
+              <h3 className="text-base sm:text-lg md:text-xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6">
+                {content.approach.process_title}
+              </h3>
+              <ol className="space-y-4 sm:space-y-6">
                 {content.approach.process_steps.map((item) => (
-                  <li key={item.step} className="flex gap-4">
-                    <span className="flex-shrink-0 w-10 h-10 bg-primary-700 text-white rounded-lg flex items-center justify-center text-sm font-semibold">
+                  <li key={item.step} className="flex gap-3 sm:gap-4">
+                    <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-primary-700 text-white rounded-lg flex items-center justify-center text-xs sm:text-sm font-semibold">
                       {item.step}
                     </span>
                     <div>
-                      <h4 className="font-semibold text-primary-900">{item.title}</h4>
-                      <p className="text-sm text-neutral-600">{item.description}</p>
+                      <h4 className="text-sm sm:text-base font-semibold text-primary-900">{item.title}</h4>
+                      <p className="text-xs sm:text-sm text-neutral-600">{item.description}</p>
                     </div>
                   </li>
                 ))}
@@ -244,30 +254,32 @@ export function AboutPage() {
 
       {/* Team Section */}
       <section className="section bg-neutral-50">
-        <div className="container-main">
-          <div className="text-center mb-12">
-            <div className="divider-accent mx-auto mb-6" />
-            <h2 className="text-h2 text-primary-900 mb-4">{content.team.title}</h2>
-            <p className="text-neutral-600 max-w-2xl mx-auto">
+        <div className="container-main px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-10 md:mb-12">
+            <div className="divider-accent mx-auto mb-4 sm:mb-6" />
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">
+              {content.team.title}
+            </h2>
+            <p className="text-xs sm:text-sm md:text-base text-neutral-600 max-w-2xl mx-auto">
               {content.team.subtitle}
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-4xl mx-auto">
             {content.team.members.map((member, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 text-center shadow-card">
+              <div key={i} className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 text-center shadow-card">
                 {member.image ? (
                   <img
                     src={member.image}
                     alt={member.name}
-                    className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full mx-auto mb-3 sm:mb-4 object-cover"
                   />
                 ) : (
-                  <div className="w-24 h-24 bg-neutral-200 rounded-full mx-auto mb-4" />
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-neutral-200 rounded-full mx-auto mb-3 sm:mb-4" />
                 )}
-                <h3 className="text-h4 text-primary-900 mb-1">{member.name}</h3>
-                <p className="text-sm text-neutral-500 mb-3">{member.position}</p>
-                <p className="text-sm text-neutral-600">{member.bio}</p>
+                <h3 className="text-sm sm:text-base md:text-lg font-serif font-semibold text-primary-900 mb-1">{member.name}</h3>
+                <p className="text-xs sm:text-sm text-neutral-500 mb-2 sm:mb-3">{member.position}</p>
+                <p className="text-xs sm:text-sm text-neutral-600">{member.bio}</p>
               </div>
             ))}
           </div>
@@ -276,14 +288,21 @@ export function AboutPage() {
 
       {/* CTA Section */}
       <section className="section bg-primary-700">
-        <div className="container-main text-center">
-          <h2 className="text-h2 text-white mb-4">{content.cta.title}</h2>
-          <p className="text-body-lg text-primary-100 max-w-2xl mx-auto mb-8">
+        <div className="container-main text-center px-4 sm:px-6">
+          <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-white mb-3 sm:mb-4">
+            {content.cta.title}
+          </h2>
+          <p className="text-sm sm:text-base md:text-lg text-primary-100 max-w-2xl mx-auto mb-6 sm:mb-8">
             {content.cta.subtitle}
           </p>
-          <Button as={Link} to={content.cta.button_link} size="lg" className="bg-white text-primary-700 hover:bg-primary-50">
+          <Button
+            as={Link}
+            to={content.cta.button_link}
+            size="lg"
+            className="w-full sm:w-auto bg-white text-primary-700 hover:bg-primary-50"
+          >
             {content.cta.button_text}
-            <ArrowRight className="ml-2 h-5 w-5" />
+            <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
         </div>
       </section>

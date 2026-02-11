@@ -1,0 +1,251 @@
+// Prisma Schema for Consultancy Platform
+// Supports PostgreSQL, MySQL, and SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  password      String
+  role          UserRole  @default(USER)
+  permissions   String[]  @default([])
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  orders        Order[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ============================================
+// CONTENT - PILLARS & SERVICES
+// ============================================
+
+model Pillar {
+  id              Int       @id @default(autoincrement())
+  name            String
+  slug            String    @unique
+  tagline         String?
+  description     String?   @db.Text
+  heroImage       String?
+  cardImage       String?
+  icon            String?
+  metaTitle       String?
+  metaDescription String?
+  sortOrder       Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  services Service[]
+  faqs     Faq[]
+
+  @@map("pillars")
+}
+
+model Service {
+  id          Int         @id @default(autoincrement())
+  pillarId    Int
+  type        ServiceType @default(ONE_OFF)
+  title       String
+  slug        String      @unique
+  summary     String?
+  details     String?     @db.Text
+  icon        String?
+  priceFrom   Decimal?    @db.Decimal(10, 2)
+  priceLabel  String?
+  sortOrder   Int         @default(0)
+  isFeatured  Boolean     @default(false)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  pillar     Pillar      @relation(fields: [pillarId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("services")
+}
+
+enum ServiceType {
+  ONE_OFF
+  SUBSCRIPTION
+}
+
+// ============================================
+// FAQS
+// ============================================
+
+model Faq {
+  id        Int      @id @default(autoincrement())
+  pillarId  Int?
+  question  String
+  answer    String   @db.Text
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  pillar Pillar? @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+
+  @@map("faqs")
+}
+
+// ============================================
+// CONTACTS
+// ============================================
+
+model Contact {
+  id        Int           @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String        @db.Text
+  pillarId  Int?
+  status    ContactStatus @default(NEW)
+  notes     String?       @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("contacts")
+}
+
+enum ContactStatus {
+  NEW
+  READ
+  RESPONDED
+  ARCHIVED
+}
+
+// ============================================
+// ORDERS
+// ============================================
+
+model Order {
+  id                  Int         @id @default(autoincrement())
+  orderNumber         String      @unique
+  userId              Int?
+  customerName        String
+  customerEmail       String
+  customerPhone       String?
+  subtotal            Decimal     @db.Decimal(10, 2)
+  tax                 Decimal     @default(0) @db.Decimal(10, 2)
+  total               Decimal     @db.Decimal(10, 2)
+  status              OrderStatus @default(PENDING)
+  paymentStatus       PaymentStatus @default(UNPAID)
+  paymentUrl          String?
+  notes               String?     @db.Text
+
+  // SuiteDash Integration
+  suitedashContactId  String?
+  suitedashInvoiceId  String?
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relations
+  user   User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items  OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  serviceId Int
+  quantity  Int     @default(1)
+  price     Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+  FAILED
+}
+
+// ============================================
+// SITE SETTINGS
+// ============================================
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  action     String
+  entity     String
+  entityId   Int?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}

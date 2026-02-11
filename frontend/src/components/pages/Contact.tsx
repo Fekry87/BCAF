@@ -129,13 +129,36 @@ export function ContactPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: ContactFormData) => contactApi.submit(data),
+    mutationFn: async (data: ContactFormData) => {
+      console.log('Submitting contact form with data:', data);
+      try {
+        const result = await contactApi.submit(data);
+        console.log('Contact API response:', result);
+        return result;
+      } catch (err) {
+        console.error('Contact API error details:', err);
+        throw err;
+      }
+    },
     onSuccess: (response) => {
+      console.log('Contact form success:', response);
       toast.success(response.message || 'Message sent successfully');
       reset();
     },
-    onError: () => {
-      toast.error('Failed to send message. Please try again.');
+    onError: (error: Error & { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }) => {
+      console.error('Contact form mutation error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data:', error.response?.data);
+      // Check for validation errors
+      if (error.response?.data?.errors) {
+        const firstError = Object.values(error.response.data.errors)[0];
+        if (firstError && firstError[0]) {
+          toast.error(firstError[0]);
+          return;
+        }
+      }
+      const errorMessage = error.response?.data?.message || 'Failed to send message. Please try again.';
+      toast.error(errorMessage);
     },
   });
 
@@ -163,12 +186,14 @@ export function ContactPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-28 bg-primary-900">
-        <div className="container-main relative z-10">
+      <section className="relative py-12 sm:py-16 md:py-20 lg:py-28 bg-primary-900">
+        <div className="container-main relative z-10 px-4 sm:px-6">
           <div className="max-w-3xl">
-            <div className="divider-accent mb-6" />
-            <h1 className="text-display text-white mb-6">{content.hero.title}</h1>
-            <p className="text-body-lg text-primary-100 leading-relaxed">
+            <div className="divider-accent mb-4 sm:mb-6" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-semibold text-white mb-4 sm:mb-6 leading-tight">
+              {content.hero.title}
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-primary-100 leading-relaxed">
               {content.hero.subtitle}
             </p>
           </div>
@@ -177,20 +202,22 @@ export function ContactPage() {
 
       {/* Contact Options */}
       <section className="section bg-neutral-50">
-        <div className="container-main">
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="container-main px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto">
             {/* Call */}
             <div className="card text-center">
-              <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Phone className="h-7 w-7 text-primary-700" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Phone className="h-6 w-6 sm:h-7 sm:w-7 text-primary-700" />
               </div>
-              <h3 className="text-h4 text-primary-900 mb-2">{content.contact_options.call.title}</h3>
-              <p className="text-neutral-600 text-sm mb-4">
+              <h3 className="text-base sm:text-lg font-serif font-semibold text-primary-900 mb-1 sm:mb-2">
+                {content.contact_options.call.title}
+              </h3>
+              <p className="text-neutral-600 text-xs sm:text-sm mb-3 sm:mb-4">
                 {content.contact_options.call.subtitle}
               </p>
               <a
                 href={`tel:${content.contact_options.call.phone.replace(/\s/g, '')}`}
-                className="text-primary-700 font-medium hover:text-primary-800"
+                className="text-sm sm:text-base text-primary-700 font-medium hover:text-primary-800 break-all"
               >
                 {content.contact_options.call.phone}
               </a>
@@ -198,33 +225,37 @@ export function ContactPage() {
 
             {/* Email */}
             <div className="card text-center">
-              <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-7 w-7 text-primary-700" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Mail className="h-6 w-6 sm:h-7 sm:w-7 text-primary-700" />
               </div>
-              <h3 className="text-h4 text-primary-900 mb-2">{content.contact_options.email.title}</h3>
-              <p className="text-neutral-600 text-sm mb-4">
+              <h3 className="text-base sm:text-lg font-serif font-semibold text-primary-900 mb-1 sm:mb-2">
+                {content.contact_options.email.title}
+              </h3>
+              <p className="text-neutral-600 text-xs sm:text-sm mb-3 sm:mb-4">
                 {content.contact_options.email.subtitle}
               </p>
               <a
                 href={`mailto:${content.contact_options.email.email}`}
-                className="text-primary-700 font-medium hover:text-primary-800"
+                className="text-sm sm:text-base text-primary-700 font-medium hover:text-primary-800 break-all"
               >
                 {content.contact_options.email.email}
               </a>
             </div>
 
             {/* Message */}
-            <div className="card text-center">
-              <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="h-7 w-7 text-primary-700" />
+            <div className="card text-center sm:col-span-2 md:col-span-1">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7 text-primary-700" />
               </div>
-              <h3 className="text-h4 text-primary-900 mb-2">{content.contact_options.message.title}</h3>
-              <p className="text-neutral-600 text-sm mb-4">
+              <h3 className="text-base sm:text-lg font-serif font-semibold text-primary-900 mb-1 sm:mb-2">
+                {content.contact_options.message.title}
+              </h3>
+              <p className="text-neutral-600 text-xs sm:text-sm mb-3 sm:mb-4">
                 {content.contact_options.message.subtitle}
               </p>
               <button
                 type="button"
-                className="text-primary-700 font-medium hover:text-primary-800"
+                className="text-sm sm:text-base text-primary-700 font-medium hover:text-primary-800"
                 onClick={() => toast('SMS messaging requires RingCentral configuration')}
               >
                 {content.contact_options.message.button_text}
@@ -236,22 +267,24 @@ export function ContactPage() {
 
       {/* Contact Form */}
       <section className="section">
-        <div className="container-main">
-          <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+        <div className="container-main px-4 sm:px-6">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-10 lg:gap-12 max-w-6xl mx-auto">
             {/* Form */}
             <div>
-              <h2 className="text-h2 text-primary-900 mb-6">{content.form.title}</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6">
+                {content.form.title}
+              </h2>
 
               {isSubmitSuccessful && mutation.isSuccess ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-                  <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-h3 text-green-800 mb-2">Message sent</h3>
-                  <p className="text-green-700">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 sm:p-8 text-center">
+                  <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-600 mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-lg sm:text-xl font-serif font-semibold text-green-800 mb-2">Message sent</h3>
+                  <p className="text-sm sm:text-base text-green-700">
                     Thank you for getting in touch. We'll respond to your enquiry shortly.
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
                   <Input
                     label="Name"
                     placeholder="Your full name"
@@ -290,7 +323,7 @@ export function ContactPage() {
                     {...register('message')}
                   />
 
-                  <Button type="submit" size="lg" isLoading={mutation.isPending}>
+                  <Button type="submit" size="lg" isLoading={mutation.isPending} className="w-full sm:w-auto">
                     Send message
                   </Button>
                 </form>
@@ -299,24 +332,28 @@ export function ContactPage() {
 
             {/* Office Info */}
             <div>
-              <div className="bg-primary-50 rounded-2xl p-8 lg:p-10">
-                <h3 className="text-h3 text-primary-900 mb-6">{content.office_hours.title}</h3>
+              <div className="bg-primary-50 rounded-xl sm:rounded-2xl p-5 sm:p-8 lg:p-10">
+                <h3 className="text-base sm:text-lg md:text-xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6">
+                  {content.office_hours.title}
+                </h3>
 
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                   {content.office_hours.items.map((item, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <Clock className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                    <div key={index} className="flex items-start gap-2 sm:gap-3">
+                      <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-medium text-primary-900">{item.day}</p>
-                        <p className="text-neutral-600">{item.hours}</p>
+                        <p className="text-sm sm:text-base font-medium text-primary-900">{item.day}</p>
+                        <p className="text-xs sm:text-sm text-neutral-600">{item.hours}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="border-t border-primary-200 pt-6">
-                  <h4 className="font-semibold text-primary-900 mb-3">{content.address.title}</h4>
-                  <p className="text-neutral-600">
+                <div className="border-t border-primary-200 pt-4 sm:pt-6">
+                  <h4 className="text-sm sm:text-base font-semibold text-primary-900 mb-2 sm:mb-3">
+                    {content.address.title}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-neutral-600">
                     {content.address.lines.map((line, index) => (
                       <span key={index}>
                         {line}
@@ -326,9 +363,11 @@ export function ContactPage() {
                   </p>
                 </div>
 
-                <div className="border-t border-primary-200 pt-6 mt-6">
-                  <h4 className="font-semibold text-primary-900 mb-3">{content.response_time.title}</h4>
-                  <p className="text-neutral-600 text-sm">
+                <div className="border-t border-primary-200 pt-4 sm:pt-6 mt-4 sm:mt-6">
+                  <h4 className="text-sm sm:text-base font-semibold text-primary-900 mb-2 sm:mb-3">
+                    {content.response_time.title}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-neutral-600">
                     {content.response_time.text}
                   </p>
                 </div>

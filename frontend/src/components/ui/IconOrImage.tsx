@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   Briefcase,
   GraduationCap,
@@ -98,7 +99,7 @@ const sizeClasses = {
   xl: { container: 'w-20 h-20', icon: 'h-10 w-10', image: 'w-20 h-20' },
 };
 
-export function IconOrImage({
+export const IconOrImage = memo(function IconOrImage({
   icon,
   imageUrl,
   size = 'md',
@@ -144,7 +145,7 @@ export function IconOrImage({
   }
 
   return <IconComponent className={`${sizes.icon} ${iconColor} ${className}`} />;
-}
+});
 
 // Export the icon map for use elsewhere
 export { iconMap };

@@ -1,59 +1,85 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { authApi } from '@/services/auth';
 import type { LoginCredentials, AuthState } from '@/types';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Token refresh interval (every 6 days to stay fresh before 7-day expiry)
+const TOKEN_REFRESH_INTERVAL = 6 * 24 * 60 * 60 * 1000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: localStorage.getItem('auth_token'),
+    token: null,
     isAuthenticated: false,
     isLoading: true,
   });
 
+  // Check authentication status on mount
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        try {
-          const response = await authApi.getUser();
-          setState({
-            user: response.data,
-            token,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch {
-          localStorage.removeItem('auth_token');
-          setState({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-        }
-      } else {
-        setState((prev) => ({ ...prev, isLoading: false }));
+      try {
+        // Try to get user - if cookie is valid, this will succeed
+        const response = await authApi.getUser();
+        setState({
+          user: response.data,
+          token: null, // Token is in HttpOnly cookie, not accessible
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch {
+        setState({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       }
     };
 
-    initAuth();
+    void initAuth();
   }, []);
+
+  // Refresh token periodically
+  const refreshToken = useCallback(async () => {
+    if (!state.isAuthenticated) return;
+
+    try {
+      await authApi.refresh();
+    } catch {
+      // Token refresh failed, user needs to re-login
+      setState({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    }
+  }, [state.isAuthenticated]);
+
+  // Set up periodic token refresh
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+
+    const intervalId = setInterval(() => {
+      void refreshToken();
+    }, TOKEN_REFRESH_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [state.isAuthenticated, refreshToken]);
 
   const login = async (credentials: LoginCredentials) => {
     const response = await authApi.login(credentials);
-    const { user, token } = response.data;
+    const { user } = response.data;
 
-    localStorage.setItem('auth_token', token);
     setState({
       user,
-      token,
+      token: null, // Token is in HttpOnly cookie
       isAuthenticated: true,
       isLoading: false,
     });
@@ -63,7 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      localStorage.removeItem('auth_token');
       setState({
         user: null,
         token: null,
@@ -74,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ ...state, login, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );

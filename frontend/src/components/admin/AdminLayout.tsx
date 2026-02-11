@@ -91,7 +91,7 @@ export function AdminLayout() {
         )}
       >
         {/* Logo */}
-        <div className="h-16 border-b border-slate-700 flex items-center justify-center px-4">
+        <div className={clsx('h-16 border-b border-slate-700 flex items-center', isCompact ? 'justify-center px-2' : 'pl-5 pr-4')}>
           <div className="flex items-center gap-2">
             {(settings?.show_logo !== false) && (
               settings?.dashboard_logo ? (
@@ -122,7 +122,7 @@ export function AdminLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className={clsx('p-2 space-y-1', isCompact ? 'px-2' : 'px-4')}>
+        <nav className={clsx('py-2 space-y-1', isCompact ? 'px-2' : 'px-2')}>
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -134,7 +134,7 @@ export function AdminLayout() {
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center gap-3 rounded-lg font-medium transition-colors',
-                    isCompact ? 'px-3 py-3 justify-center' : 'px-4 py-3',
+                    isCompact ? 'px-3 py-3 justify-center' : 'px-3 py-3',
                     isActive
                       ? 'text-white'
                       : 'text-slate-400 hover:bg-slate-700 hover:text-white'

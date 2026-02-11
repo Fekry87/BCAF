@@ -5,9 +5,25 @@
   "scripts": {
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
-    "start": "cd mock-api && node server.js"
+    "start": "cd mock-api && node server.js",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm run test:run",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.2"
+  },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "frontend/src/**/*.{css,json}": [
+      "prettier --write"
+    ]
   }
 }

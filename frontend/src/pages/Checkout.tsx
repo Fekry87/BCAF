@@ -155,54 +155,54 @@ export default function Checkout() {
     // No payment URL - Contact created in SuiteDash but Invoice API not available
     if (!paymentUrl) {
       return (
-        <div className="min-h-[70vh] flex items-center justify-center py-12">
-          <div className="text-center max-w-lg mx-auto px-4">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+        <div className="min-h-[70vh] flex items-center justify-center py-8 sm:py-12 px-4">
+          <div className="text-center max-w-lg mx-auto">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />
             </div>
-            <h1 className="text-h2 text-primary-900 mb-4">Order Created Successfully!</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">Order Created Successfully!</h1>
             {orderNumber && (
-              <p className="text-sm text-primary-600 font-medium mb-2">
+              <p className="text-xs sm:text-sm text-primary-600 font-medium mb-2">
                 Order Number: {orderNumber}
               </p>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <p className="text-blue-800 text-sm">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <p className="text-blue-800 text-xs sm:text-sm">
                 <strong>Your details have been saved</strong>
               </p>
-              <p className="text-blue-700 text-xs mt-2">
+              <p className="text-blue-700 text-[10px] sm:text-xs mt-1 sm:mt-2">
                 Your contact information has been registered. Our team will send you an invoice with payment instructions shortly.
               </p>
             </div>
 
-            <div className="bg-neutral-50 rounded-xl p-6 mb-6 border border-neutral-200">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-neutral-600">Order Total</span>
-                <span className="text-2xl font-bold text-primary-900">
+            <div className="bg-neutral-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-neutral-200">
+              <div className="flex justify-between items-center mb-3 sm:mb-4">
+                <span className="text-sm text-neutral-600">Order Total</span>
+                <span className="text-xl sm:text-2xl font-bold text-primary-900">
                   £{totalPrice.toLocaleString()}
                 </span>
               </div>
-              <div className="text-xs text-neutral-500 text-left">
+              <div className="text-[10px] sm:text-xs text-neutral-500 text-left">
                 <p className="mb-1">✓ Your contact has been registered</p>
                 <p className="mb-1">✓ Invoice will be sent to your email</p>
                 <p>✓ Our team will contact you shortly</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <Button
                 onClick={handleSkipPayment}
                 size="lg"
-                className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold"
+                className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold text-sm sm:text-base"
               >
-                <CheckCircle className="h-5 w-5 mr-2" />
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Continue
               </Button>
 
               <Link
                 to="/"
-                className="block text-sm text-neutral-500 hover:text-neutral-700 py-2"
+                className="block text-xs sm:text-sm text-neutral-500 hover:text-neutral-700 py-2"
               >
                 Return to Home
               </Link>
@@ -215,54 +215,54 @@ export default function Checkout() {
     // Demo mode - payment integration not fully configured
     if (isDemoMode) {
       return (
-        <div className="min-h-[70vh] flex items-center justify-center py-12">
-          <div className="text-center max-w-lg mx-auto px-4">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+        <div className="min-h-[70vh] flex items-center justify-center py-8 sm:py-12 px-4">
+          <div className="text-center max-w-lg mx-auto">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />
             </div>
-            <h1 className="text-h2 text-primary-900 mb-4">Order Created Successfully!</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">Order Created Successfully!</h1>
             {orderNumber && (
-              <p className="text-sm text-primary-600 font-medium mb-2">
+              <p className="text-xs sm:text-sm text-primary-600 font-medium mb-2">
                 Order Number: {orderNumber}
               </p>
             )}
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-              <p className="text-amber-800 text-sm">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <p className="text-amber-800 text-xs sm:text-sm">
                 <strong>Payment Integration in Demo Mode</strong>
               </p>
-              <p className="text-amber-700 text-xs mt-2">
+              <p className="text-amber-700 text-[10px] sm:text-xs mt-1 sm:mt-2">
                 SuiteDash payment integration is not fully configured. Your order has been created and you will receive an invoice by email with payment instructions.
               </p>
             </div>
 
-            <div className="bg-neutral-50 rounded-xl p-6 mb-6 border border-neutral-200">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-neutral-600">Order Total</span>
-                <span className="text-2xl font-bold text-primary-900">
+            <div className="bg-neutral-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-neutral-200">
+              <div className="flex justify-between items-center mb-3 sm:mb-4">
+                <span className="text-sm text-neutral-600">Order Total</span>
+                <span className="text-xl sm:text-2xl font-bold text-primary-900">
                   £{totalPrice.toLocaleString()}
                 </span>
               </div>
-              <div className="text-xs text-neutral-500 text-left">
+              <div className="text-[10px] sm:text-xs text-neutral-500 text-left">
                 <p className="mb-1">• Invoice will be sent to your email</p>
                 <p className="mb-1">• Our team will contact you shortly</p>
                 <p>• Payment instructions included in invoice</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <Button
                 onClick={handleSkipPayment}
                 size="lg"
-                className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold"
+                className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold text-sm sm:text-base"
               >
-                <CheckCircle className="h-5 w-5 mr-2" />
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Continue
               </Button>
 
               <Link
                 to="/"
-                className="block text-sm text-neutral-500 hover:text-neutral-700 py-2"
+                className="block text-xs sm:text-sm text-neutral-500 hover:text-neutral-700 py-2"
               >
                 Return to Home
               </Link>
@@ -274,58 +274,58 @@ export default function Checkout() {
 
     // Real SuiteDash payment - redirect to payment portal
     return (
-      <div className="min-h-[70vh] flex items-center justify-center py-12">
-        <div className="text-center max-w-lg mx-auto px-4">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CreditCard className="h-10 w-10 text-blue-600" />
+      <div className="min-h-[70vh] flex items-center justify-center py-8 sm:py-12 px-4">
+        <div className="text-center max-w-lg mx-auto">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600" />
           </div>
-          <h1 className="text-h2 text-primary-900 mb-4">Complete Your Payment</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">Complete Your Payment</h1>
           {orderNumber && (
-            <p className="text-sm text-primary-600 font-medium mb-2">
+            <p className="text-xs sm:text-sm text-primary-600 font-medium mb-2">
               Order Number: {orderNumber}
             </p>
           )}
-          <p className="text-neutral-600 mb-2">
+          <p className="text-sm sm:text-base text-neutral-600 mb-2">
             Your order has been created successfully!
           </p>
-          <p className="text-neutral-600 mb-8">
+          <p className="text-xs sm:text-sm text-neutral-600 mb-6 sm:mb-8">
             Click the button below to proceed to our secure payment portal powered by SuiteDash.
           </p>
 
-          <div className="bg-neutral-50 rounded-xl p-6 mb-6 border border-neutral-200">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-neutral-600">Order Total</span>
-              <span className="text-2xl font-bold text-primary-900">
+          <div className="bg-neutral-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-neutral-200">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <span className="text-sm text-neutral-600">Order Total</span>
+              <span className="text-xl sm:text-2xl font-bold text-primary-900">
                 £{totalPrice.toLocaleString()}
               </span>
             </div>
-            <div className="text-xs text-neutral-500 text-left">
+            <div className="text-[10px] sm:text-xs text-neutral-500 text-left">
               <p className="mb-1">• Secure payment processing</p>
               <p className="mb-1">• Multiple payment methods accepted</p>
               <p>• Invoice will be sent to your email</p>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <Button
               onClick={handleProceedToPayment}
               size="lg"
-              className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold"
+              className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold text-sm sm:text-base"
             >
-              <CreditCard className="h-5 w-5 mr-2" />
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               Proceed to Payment
-              <ExternalLink className="h-4 w-4 ml-2" />
+              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-2" />
             </Button>
 
             <button
               onClick={handleSkipPayment}
-              className="w-full text-sm text-neutral-500 hover:text-neutral-700 py-2"
+              className="w-full text-xs sm:text-sm text-neutral-500 hover:text-neutral-700 py-2"
             >
               I'll pay later (receive invoice by email)
             </button>
           </div>
 
-          <p className="text-xs text-neutral-400 mt-6">
+          <p className="text-[10px] sm:text-xs text-neutral-400 mt-4 sm:mt-6">
             You will be redirected to SuiteDash's secure payment portal
           </p>
         </div>
@@ -336,27 +336,27 @@ export default function Checkout() {
   // Success State
   if (isComplete) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center py-12">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="h-10 w-10 text-green-600" />
+      <div className="min-h-[70vh] flex items-center justify-center py-8 sm:py-12 px-4">
+        <div className="text-center max-w-md mx-auto">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />
           </div>
-          <h1 className="text-h2 text-primary-900 mb-4">Order Submitted!</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">Order Submitted!</h1>
           {orderNumber && (
-            <p className="text-sm text-primary-600 font-medium mb-2">
+            <p className="text-xs sm:text-sm text-primary-600 font-medium mb-2">
               Order Number: {orderNumber}
             </p>
           )}
-          <p className="text-neutral-600 mb-4">
+          <p className="text-sm sm:text-base text-neutral-600 mb-3 sm:mb-4">
             Thank you for your order. Your invoice has been created in our system.
           </p>
-          <p className="text-neutral-600 mb-8">
+          <p className="text-xs sm:text-sm text-neutral-600 mb-6 sm:mb-8">
             You will receive an email with your invoice and payment instructions shortly.
           </p>
           <Button
             as={Link}
             to="/"
-            className="bg-accent-yellow text-primary-900 hover:bg-yellow-400"
+            className="w-full sm:w-auto bg-accent-yellow text-primary-900 hover:bg-yellow-400"
           >
             Return to Home
           </Button>
@@ -368,19 +368,19 @@ export default function Checkout() {
   // Empty Cart State
   if (items.length === 0) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center py-12">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <ShoppingCart className="h-10 w-10 text-neutral-400" />
+      <div className="min-h-[70vh] flex items-center justify-center py-8 sm:py-12 px-4">
+        <div className="text-center max-w-md mx-auto">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <ShoppingCart className="h-8 w-8 sm:h-10 sm:w-10 text-neutral-400" />
           </div>
-          <h1 className="text-h2 text-primary-900 mb-4">Your cart is empty</h1>
-          <p className="text-neutral-600 mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-primary-900 mb-3 sm:mb-4">Your cart is empty</h1>
+          <p className="text-sm sm:text-base text-neutral-600 mb-6 sm:mb-8">
             Looks like you haven't added any services yet. Browse our offerings and add services to get started.
           </p>
           <Button
             as={Link}
             to="/"
-            className="bg-accent-yellow text-primary-900 hover:bg-yellow-400"
+            className="w-full sm:w-auto bg-accent-yellow text-primary-900 hover:bg-yellow-400"
           >
             Browse Services
           </Button>
@@ -390,35 +390,36 @@ export default function Checkout() {
   }
 
   return (
-    <div className="py-8 md:py-12 bg-neutral-50 min-h-screen">
+    <div className="py-6 sm:py-8 md:py-12 bg-neutral-50 min-h-screen px-4 sm:px-6">
       <div className="container-main">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-primary-700 hover:text-primary-800 mb-4 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-primary-700 hover:text-primary-800 mb-3 sm:mb-4 text-xs sm:text-sm font-medium"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Continue Shopping
           </Link>
-          <h1 className="text-h1 text-primary-900">Checkout</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-serif font-semibold text-primary-900">Checkout</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-7 xl:col-span-8 space-y-6">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4 sm:space-y-6">
             {/* Sign In Prompt (if not authenticated) */}
             {!isAuthenticated && (
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-neutral-200">
-                <div className="flex items-center justify-between">
+              <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-sm border border-neutral-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div>
-                    <h3 className="font-semibold text-primary-900">Already have an account?</h3>
-                    <p className="text-sm text-neutral-600">Sign in to autofill your details and track your orders</p>
+                    <h3 className="text-sm sm:text-base font-semibold text-primary-900">Already have an account?</h3>
+                    <p className="text-xs sm:text-sm text-neutral-600">Sign in to autofill your details and track your orders</p>
                   </div>
                   <Button
                     variant="secondary"
                     onClick={openSignIn}
                     size="sm"
+                    className="w-full sm:w-auto"
                   >
                     Sign In
                   </Button>
@@ -427,13 +428,13 @@ export default function Checkout() {
             )}
 
             {/* Contact Information */}
-            <div className="bg-white rounded-xl p-6 md:p-8 shadow-sm border border-neutral-200">
-              <h2 className="text-h3 text-primary-900 mb-6 flex items-center gap-3">
-                <span className="w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+            <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 shadow-sm border border-neutral-200">
+              <h2 className="text-base sm:text-lg md:text-xl font-serif font-semibold text-primary-900 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+                <span className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold">1</span>
                 Contact Information
               </h2>
 
-              <form id="checkout-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <form id="checkout-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input
                     label="First Name"
@@ -484,13 +485,13 @@ export default function Checkout() {
             </div>
 
             {/* Security Notice */}
-            <div className="bg-primary-50 rounded-xl p-5 flex items-start gap-4 border border-primary-100">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Lock className="h-5 w-5 text-primary-700" />
+            <div className="bg-primary-50 rounded-lg sm:rounded-xl p-4 sm:p-5 flex items-start gap-3 sm:gap-4 border border-primary-100">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-primary-700" />
               </div>
               <div>
-                <h4 className="font-semibold text-primary-900 mb-1">Your information is secure</h4>
-                <p className="text-sm text-primary-700">
+                <h4 className="text-sm sm:text-base font-semibold text-primary-900 mb-1">Your information is secure</h4>
+                <p className="text-xs sm:text-sm text-primary-700">
                   We'll review your request and contact you to discuss your requirements in detail.
                   No payment is required at this stage - you'll receive a customized quote first.
                 </p>
@@ -500,52 +501,52 @@ export default function Checkout() {
 
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-5 xl:col-span-4">
-            <div className="bg-white rounded-xl shadow-sm border border-neutral-200 sticky top-24 overflow-hidden">
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-neutral-200 lg:sticky lg:top-24 overflow-hidden">
               {/* Header */}
-              <div className="bg-primary-900 text-white px-6 py-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
+              <div className="bg-primary-900 text-white px-4 sm:px-6 py-3 sm:py-4">
+                <h2 className="text-sm sm:text-lg font-semibold flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                   Order Summary
                 </h2>
-                <p className="text-sm text-primary-200 mt-1">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs sm:text-sm text-primary-200 mt-0.5 sm:mt-1">{items.length} item{items.length !== 1 ? 's' : ''}</p>
               </div>
 
               {/* Items */}
-              <div className="p-4 max-h-[400px] overflow-y-auto">
-                <div className="space-y-4">
+              <div className="p-3 sm:p-4 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+                <div className="space-y-3 sm:space-y-4">
                   {items.map(item => (
-                    <div key={item.id} className="bg-neutral-50 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
+                    <div key={item.id} className="bg-neutral-50 rounded-lg p-3 sm:p-4">
+                      <div className="flex justify-between items-start mb-2 sm:mb-3">
                         <div className="flex-1 min-w-0 pr-2">
-                          <h4 className="font-medium text-primary-900 truncate">{item.title}</h4>
-                          <p className="text-xs text-neutral-500 mt-0.5">{item.pillar_name}</p>
+                          <h4 className="text-sm sm:text-base font-medium text-primary-900 truncate">{item.title}</h4>
+                          <p className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">{item.pillar_name}</p>
                         </div>
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          className="p-1 sm:p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                           title="Remove item"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </button>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
                           <button
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="w-7 h-7 rounded bg-white border border-neutral-200 flex items-center justify-center hover:bg-neutral-100 transition-colors"
+                            className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-white border border-neutral-200 flex items-center justify-center hover:bg-neutral-100 transition-colors"
                           >
-                            <Minus className="h-3 w-3" />
+                            <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                          <span className="w-6 sm:w-8 text-center text-xs sm:text-sm font-medium">{item.quantity}</span>
                           <button
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="w-7 h-7 rounded bg-white border border-neutral-200 flex items-center justify-center hover:bg-neutral-100 transition-colors"
+                            className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-white border border-neutral-200 flex items-center justify-center hover:bg-neutral-100 transition-colors"
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </button>
                         </div>
-                        <span className="text-sm font-semibold text-primary-900">{item.price_label}</span>
+                        <span className="text-xs sm:text-sm font-semibold text-primary-900">{item.price_label}</span>
                       </div>
                     </div>
                   ))}
@@ -553,30 +554,30 @@ export default function Checkout() {
               </div>
 
               {/* Totals */}
-              <div className="border-t border-neutral-200 p-4 space-y-3 bg-neutral-50">
-                <div className="flex justify-between text-sm">
+              <div className="border-t border-neutral-200 p-3 sm:p-4 space-y-2 sm:space-y-3 bg-neutral-50">
+                <div className="flex justify-between text-xs sm:text-sm">
                   <span className="text-neutral-600">Subtotal</span>
                   <span className="font-medium">£{totalPrice.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center pt-3 border-t border-neutral-200">
-                  <span className="font-semibold text-primary-900">Estimated Total</span>
-                  <span className="text-xl font-bold text-primary-900">
+                <div className="flex justify-between items-center pt-2 sm:pt-3 border-t border-neutral-200">
+                  <span className="text-sm sm:text-base font-semibold text-primary-900">Estimated Total</span>
+                  <span className="text-lg sm:text-xl font-bold text-primary-900">
                     £{totalPrice.toLocaleString()}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-500 text-center">
+                <p className="text-[10px] sm:text-xs text-neutral-500 text-center">
                   Final pricing confirmed after consultation
                 </p>
               </div>
 
               {/* Submit Button */}
-              <div className="p-4 pt-0">
+              <div className="p-3 sm:p-4 pt-0">
                 <Button
                   type="submit"
                   form="checkout-form"
                   size="lg"
                   isLoading={isSubmitting}
-                  className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold"
+                  className="w-full bg-accent-yellow text-primary-900 hover:bg-yellow-400 font-semibold text-sm sm:text-base"
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Order Request'}
                 </Button>

@@ -1,0 +1,189 @@
+# Prometheus Alerting Rules for Consultancy Platform
+
+groups:
+  # =============================================================================
+  # Application Alerts
+  # =============================================================================
+  - name: application
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High response time detected
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      - alert: ApplicationDown
+        expr: up{job="consultancy-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Application is down
+          description: "The consultancy platform application is not responding"
+
+  # =============================================================================
+  # Infrastructure Alerts
+  # =============================================================================
+  - name: infrastructure
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU usage
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+          / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Low disk space
+          description: "Disk space is {{ $value }}% available on {{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+          / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Critical disk space
+          description: "Disk space is {{ $value }}% available on {{ $labels.mountpoint }}"
+
+  # =============================================================================
+  # Container Alerts
+  # =============================================================================
+  - name: containers
+    rules:
+      - alert: ContainerHighCPU
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container high CPU usage
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%"
+
+      - alert: ContainerHighMemory
+        expr: |
+          (container_memory_usage_bytes{name!=""}
+          / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container high memory usage
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}%"
+
+      - alert: ContainerDown
+        expr: |
+          absent(container_last_seen{name=~"consultancy.*"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Container down
+          description: "A consultancy platform container is not running"
+
+  # =============================================================================
+  # Database Alerts
+  # =============================================================================
+  - name: database
+    rules:
+      - alert: MySQLDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: MySQL is down
+          description: "MySQL database is not responding"
+
+      - alert: MySQLHighConnections
+        expr: |
+          mysql_global_status_threads_connected
+          / mysql_global_variables_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High MySQL connections
+          description: "MySQL connections are at {{ $value }}% of max"
+
+      - alert: MySQLSlowQueries
+        expr: |
+          rate(mysql_global_status_slow_queries[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: MySQL slow queries detected
+          description: "{{ $value }} slow queries per second"
+
+  # =============================================================================
+  # Redis Alerts
+  # =============================================================================
+  - name: redis
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redis is down
+          description: "Redis cache is not responding"
+
+      - alert: RedisHighMemory
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High Redis memory usage
+          description: "Redis memory usage is {{ $value }}%"
+
+      - alert: RedisHighKeyEviction
+        expr: |
+          rate(redis_evicted_keys_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High Redis key eviction
+          description: "Redis is evicting {{ $value }} keys per second"
