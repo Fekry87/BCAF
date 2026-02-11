@@ -1200,12 +1200,11 @@ app.post('/api/contact', contactLimiter, validateContact, handleValidationErrors
 // AUTH ROUTES (with rate limiting, validation, and HttpOnly cookies)
 // ============================================
 
-// Cookie configuration - different for production (cross-site) vs development
-const isProduction = process.env.NODE_ENV === 'production';
+// Cookie configuration - use 'none' for cross-site cookies (Cloudflare + Render)
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: isProduction, // HTTPS only in production
-  sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
+  secure: true, // Required for SameSite=None
+  sameSite: 'none', // Required for cross-site cookies
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
@@ -1587,11 +1586,11 @@ async function syncContactToSuiteDashSimple(config, contact) {
   return null;
 }
 
-// Cookie configuration for user auth - different for production (cross-site) vs development
+// Cookie configuration for user auth - use 'none' for cross-site cookies
 const USER_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: isProduction, // HTTPS only in production
-  sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
+  secure: true, // Required for SameSite=None
+  sameSite: 'none', // Required for cross-site cookies
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   path: '/',
 };
