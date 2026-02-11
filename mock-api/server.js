@@ -52,7 +52,14 @@ app.use(sanitizeRequest);
 
 // CORS configuration
 app.use(cors({
-  origin: [config.frontendUrl, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: [
+    config.frontendUrl,
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'https://bcaf-consultancy.pages.dev',
+    /\.bcaf-consultancy\.pages\.dev$/
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
