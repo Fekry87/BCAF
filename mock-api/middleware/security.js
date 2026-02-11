@@ -12,7 +12,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 export const apiLimiter = isProduction
   ? rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // Limit each IP to 100 requests per window
+      max: 500, // Limit each IP to 500 requests per window
       message: {
         success: false,
         data: null,
@@ -21,6 +21,7 @@ export const apiLimiter = isProduction
       },
       standardHeaders: true,
       legacyHeaders: false,
+      skip: (req) => req.path === '/api/health', // Skip health checks
     })
   : (req, res, next) => next(); // Skip rate limiting in development
 
@@ -28,7 +29,7 @@ export const apiLimiter = isProduction
 export const authLimiter = isProduction
   ? rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 5, // Limit each IP to 5 login attempts per window
+      max: 20, // Limit each IP to 20 login attempts per window
       message: {
         success: false,
         data: null,
