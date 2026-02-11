@@ -5,9 +5,11 @@ services:
     region: oregon
     plan: free
     buildCommand: cd mock-api && npm install
-    startCommand: cd mock-api && node server.js
+    startCommand: cd mock-api && NODE_ENV=production node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 8000
+      - key: FRONTEND_URL
+        value: https://bcaf-consultancy.pages.dev
